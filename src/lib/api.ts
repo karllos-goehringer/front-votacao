@@ -45,7 +45,13 @@ export async function api<T>(
   const tempoMs = Math.round((performance.now() - inicio) * 10) / 10;
 
   if (!res.ok) {
-    const msg = data && typeof data.error === "string" ? data.error : `Erro ${res.status}`;
+    // Erros do back: { error: CODIGO, message } (AppError) ou { error: mensagem }.
+    const msg =
+      data && typeof data.message === "string"
+        ? data.message
+        : data && typeof data.error === "string"
+          ? data.error
+          : `Erro ${res.status}`;
     throw new ErroApi(msg, res.status);
   }
   const servidor = res.headers.get("X-Tempo-Processamento");

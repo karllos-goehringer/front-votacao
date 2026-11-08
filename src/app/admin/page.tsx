@@ -10,8 +10,10 @@ import { useFila } from "@/lib/fila/FilaProvider";
 import {
   duracao,
   horario,
+  normalizarContagem,
   senha,
   type ContagemCandidato,
+  type TipoFila,
   type Usuario,
   type UsuarioNaFila,
   type Voto,
@@ -31,7 +33,35 @@ interface UltimaAcao {
   ok: boolean;
   tempoMs?: number;
   corpo: string;
+  /** Frase curta com o resultado, para não precisar ler o JSON. */
+  resumo?: string;
 }
+
+/** Respostas dos métodos do TAD Fila em /api/v1/filas/:tipoFila. */
+interface RespPrimeiro {
+  primeiro: Usuario | null;
+  vazia: boolean;
+}
+interface RespVazia {
+  vazia: boolean;
+  tamanho: number;
+}
+interface RespExibir {
+  exibicao: string;
+  tamanho: number;
+  vazia: boolean;
+}
+interface RespPosicao {
+  posicaoFila: number;
+}
+interface RespInverter {
+  tamanhoAtual: number;
+  exibicao: string;
+}
+
+type OperacaoFila = "primeiro" | "vazia" | "exibir" | "inverter" | "limpar";
+
+const NOME_FILA = { PREFERENCIAL: "preferencial", COMUM: "comum" } as const;
 
 function Admin() {
   const { sessao, logout, chamar } = useAdmin();
@@ -48,12 +78,19 @@ function Admin() {
 
   /** Chama um método da API e mostra a resposta (ou o erro) na tela. */
   const executar = useCallback(
-    async <T,>(metodo: string, rota: string, aoReceber?: (data: T) => void) => {
+    async <T,>(metodo: string, rota: string, aoReceber?: (data: T) => void, resumir?: (data: T) => string) => {
       setOcupado(true);
       try {
         const r = await chamar<T>(rota, metodo);
         aoReceber?.(r.data);
-        setUltima({ metodo, rota, ok: true, tempoMs: r.tempoMs, corpo: JSON.stringify(r.data, null, 2) });
+        setUltima({
+          metodo,
+          rota,
+          ok: true,
+          tempoMs: r.tempoMs,
+          corpo: JSON.stringify(r.data, null, 2),
+          resumo: resumir?.(r.data),
+        });
       } catch (err) {
         setUltima({ metodo, rota, ok: false, corpo: mensagemDeErro(err) });
       } finally {
@@ -88,6 +125,61 @@ function Admin() {
   const remover = (u: UsuarioNaFila) => {
     if (confirm(`Tirar ${senha(u)} (${u.nome}) da fila?`)) void executar("DELETE", `/fila/${u.id}`);
   };
+
+  // ---- Métodos do TAD Fila (/api/v1/filas/:tipoFila/...) para cada fila.
+  // Leituras consultam a fila que está na tela; alterações só valem na fila de demonstração (o back protege a real).
+  const escopoLeitura = estado?.modoMock ? "mock" : "real";
+  const baseFila = (tipo: TipoFila) => `/api/v1/filas/${NOME_FILA[tipo]}`;
+  const rotuloFila = (tipo: TipoFila) => `fila ${NOME_FILA[tipo]}`;
+
+  /** O back bloqueia alterações na fila real: avisa que a operação vai para a fila de demonstração. */
+  const confirmarAlteracao = (texto: string) =>
+    confirm(
+      estado?.modoMock
+        ? texto
+        : `${texto}\n\nAtenção: a fila real é protegida. A operação será feita na fila de DEMONSTRAÇÃO e o painel passará a exibi-la.`,
+    );
+
+  const tad: Record<OperacaoFila, (tipo: TipoFila) => void> = {
+    primeiro: (tipo) =>
+      void executar<RespPrimeiro>(
+        "GET",
+        `${baseFila(tipo)}/elementos/primeiro?escopo=${escopoLeitura}`,
+        undefined,
+        (d) =>
+          d.primeiro
+            ? `Primeiro da ${rotuloFila(tipo)}: ${senha(d.primeiro)} — ${d.primeiro.nome}`
+            : `A ${rotuloFila(tipo)} está vazia: não há primeiro elemento.`,
+      ),
+    vazia: (tipo) =>
+      void executar<RespVazia>("GET", `${baseFila(tipo)}/status?escopo=${escopoLeitura}`, undefined, (d) =>
+        d.vazia
+          ? `Sim, a ${rotuloFila(tipo)} está vazia.`
+          : `Não, a ${rotuloFila(tipo)} tem ${d.tamanho} ${d.tamanho === 1 ? "elemento" : "elementos"}.`,
+      ),
+    exibir: (tipo) =>
+      void executar<RespExibir>("GET", `${baseFila(tipo)}/elementos?escopo=${escopoLeitura}`, undefined, (d) =>
+        d.vazia ? `A ${rotuloFila(tipo)} está vazia.` : `${d.tamanho} na ${rotuloFila(tipo)}: ${d.exibicao}`,
+      ),
+    inverter: (tipo) => {
+      if (!confirmarAlteracao(`Inverter a ordem da ${rotuloFila(tipo)}?`)) return;
+      void executar<RespInverter>("POST", `${baseFila(tipo)}/inversao?escopo=mock`, undefined, (d) =>
+        d.tamanhoAtual === 0 ? `A ${rotuloFila(tipo)} está vazia; nada a inverter.` : `Nova ordem: ${d.exibicao}`,
+      );
+    },
+    limpar: (tipo) => {
+      if (!confirmarAlteracao(`Apagar TODOS os elementos da ${rotuloFila(tipo)}?`)) return;
+      void executar("DELETE", `${baseFila(tipo)}/elementos?escopo=mock`, undefined, () => `A ${rotuloFila(tipo)} foi esvaziada.`);
+    },
+  };
+
+  const posicaoDe = (u: UsuarioNaFila) =>
+    void executar<RespPosicao>(
+      "GET",
+      `${baseFila(u.tipoFila)}/elementos/${u.id}/posicao?escopo=${escopoLeitura}`,
+      undefined,
+      (d) => `${senha(u)} (${u.nome}) está na ${d.posicaoFila}ª posição da ${rotuloFila(u.tipoFila)}.`,
+    );
 
   const ACOES: Array<{ rotulo: string; metodo: string; rota: string; acao: () => void; desabilitar?: boolean; dica: string }> = [
     { rotulo: "Ver fila", metodo: "GET", rota: "/fila", acao: () => void executar("GET", "/fila"), dica: "Estado completo das filas e da cabine" },
@@ -124,7 +216,7 @@ function Admin() {
       rotulo: "Resultados parciais",
       metodo: "GET",
       rota: "/resultados",
-      acao: () => void executar<ContagemCandidato[]>("GET", "/resultados", setContagem),
+      acao: () => void executar<unknown>("GET", "/resultados", (d) => setContagem(normalizarContagem(d))),
       dica: "Array dos candidatos com o total de votos de cada um",
     },
     { rotulo: "Relatório de votos", metodo: "GET", rota: "/votos", acao: () => void carregarRelatorio(), dica: "Quem votou em quem, horário e tempos" },
@@ -195,6 +287,11 @@ function Admin() {
               · {ultima.ok ? "ok" : "erro"}
               {ultima.tempoMs !== undefined && ` · requisição levou ${duracao(ultima.tempoMs)}`}
             </p>
+            {ultima.ok && ultima.resumo && (
+              <p className="mb-2 rounded-lg border border-primary/40 bg-primary/10 px-3 py-2 text-sm font-medium">
+                {ultima.resumo}
+              </p>
+            )}
             {ultima.ok ? (
               <pre className="max-h-64 overflow-auto rounded-lg bg-background p-3 text-xs font-mono">{ultima.corpo}</pre>
             ) : (
@@ -211,14 +308,32 @@ function Admin() {
               key={tipo}
               tipo={tipo}
               usuarios={tipo === "PREFERENCIAL" ? estado.preferencial : estado.comum}
+              ferramentas={
+                <FerramentasFila
+                  tipo={tipo}
+                  ocupado={ocupado}
+                  vazia={(tipo === "PREFERENCIAL" ? estado.preferencial : estado.comum).length === 0}
+                  tad={tad}
+                />
+              }
               acao={(u) => (
-                <button
-                  onClick={() => remover(u)}
-                  disabled={ocupado}
-                  className="text-xs text-danger hover:underline disabled:opacity-50"
-                >
-                  Remover
-                </button>
+                <span className="flex items-center gap-3">
+                  <button
+                    onClick={() => posicaoDe(u)}
+                    disabled={ocupado}
+                    title="posicaoDe(): verifica a posição deste elemento na fila"
+                    className="text-xs text-primary hover:underline disabled:opacity-50"
+                  >
+                    Posição
+                  </button>
+                  <button
+                    onClick={() => remover(u)}
+                    disabled={ocupado}
+                    className="text-xs text-danger hover:underline disabled:opacity-50"
+                  >
+                    Remover
+                  </button>
+                </span>
               )}
             />
           ))}
@@ -262,6 +377,44 @@ function Admin() {
           </div>
         )}
       </Cartao>
+    </div>
+  );
+}
+
+/** Botões dos métodos do TAD Fila mostrados no topo de cada fila. */
+function FerramentasFila({
+  tipo,
+  ocupado,
+  vazia,
+  tad,
+}: {
+  tipo: TipoFila;
+  ocupado: boolean;
+  vazia: boolean;
+  tad: Record<OperacaoFila, (tipo: TipoFila) => void>;
+}) {
+  const botoes: Array<{ op: OperacaoFila; rotulo: string; dica: string; perigo?: boolean; precisaElementos?: boolean }> = [
+    { op: "primeiro", rotulo: "Primeiro", dica: "primeiro(): mostra quem está na frente da fila" },
+    { op: "vazia", rotulo: "Está vazia?", dica: "estaVazia(): verifica se a fila não tem elementos" },
+    { op: "exibir", rotulo: "Exibir", dica: "exibir(): lista os elementos da fila em ordem" },
+    { op: "inverter", rotulo: "Inverter", dica: "inverter(): inverte a ordem dos elementos da fila", precisaElementos: true },
+    { op: "limpar", rotulo: "Apagar todos", dica: "limpar(): remove todos os elementos da fila", perigo: true, precisaElementos: true },
+  ];
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {botoes.map((b) => (
+        <button
+          key={b.op}
+          onClick={() => tad[b.op](tipo)}
+          disabled={ocupado || (b.precisaElementos && vazia)}
+          title={b.dica}
+          className={`rounded-md border border-border bg-background px-2.5 py-1 text-xs font-medium transition disabled:opacity-50 disabled:cursor-not-allowed ${
+            b.perigo ? "text-danger hover:bg-danger-soft" : "hover:border-primary"
+          }`}
+        >
+          {b.rotulo}
+        </button>
+      ))}
     </div>
   );
 }

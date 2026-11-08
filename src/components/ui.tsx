@@ -61,7 +61,7 @@ export function corCandidato(id: number) {
 }
 
 /** Sem foto cadastrada: mostra a letra do candidato num círculo. */
-export function FotoCandidato({ id, nome, urlFoto, className = "size-20 text-4xl" }: { id: number; nome: string; urlFoto?: string; className?: string }) {
+export function FotoCandidato({ id, nome, urlFoto, className = "size-20 text-4xl" }: { id: number; nome: string; urlFoto?: string | null; className?: string }) {
   const cor = corCandidato(id);
   if (urlFoto) {
     // eslint-disable-next-line @next/next/no-img-element
@@ -79,7 +79,7 @@ export function BarrasResultado({
   resultado,
   destacarId,
 }: {
-  resultado: { candidatoId: number; nome: string; partido: { nome: string; digito: string }; votos: number }[];
+  resultado: { candidatoId: number; nome: string; partido: { nome: string; digito: string } | null; votos: number }[];
   destacarId?: number;
 }) {
   const total = resultado.reduce((s, c) => s + c.votos, 0);
@@ -98,7 +98,7 @@ export function BarrasResultado({
                   {c.candidatoId === destacarId && <span className="ml-2 text-xs text-primary">seu voto</span>}
                 </p>
                 <p className="text-xs text-muted">
-                  {c.partido.nome} · {c.partido.digito}
+                  {c.partido ? `${c.partido.nome} · ${c.partido.digito}` : "Voto nulo"}
                 </p>
               </div>
               <p className="ml-auto text-right">

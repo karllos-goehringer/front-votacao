@@ -13,6 +13,7 @@ import {
   lerEstado,
   lerTicket,
 } from "./sessao";
+import { normalizarContagem } from "./tipos";
 import type {
   Comprovante,
   ContagemCandidato,
@@ -68,7 +69,7 @@ export function FilaProvider({ children }: { children: ReactNode }) {
   const [resultadoEm, setResultadoEm] = useState<string | null>(null);
   const [erroResultado, setErroResultado] = useState<string | null>(null);
   const setResultado = useCallback((r: ContagemCandidato[]) => {
-    setResultadoBruto(r);
+    setResultadoBruto(normalizarContagem(r));
     setResultadoEm(new Date().toISOString());
     setErroResultado(null);
   }, []);

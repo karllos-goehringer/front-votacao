@@ -21,6 +21,8 @@ export interface UsuarioNaFila extends Usuario {
 }
 
 export interface FilaEstado {
+  /** true quando o contexto exibido é o de demonstração (mock). */
+  modoMock?: boolean;
   preferencial: UsuarioNaFila[];
   comum: UsuarioNaFila[];
   /** Quem está na cabine é quem pode votar. */
@@ -35,20 +37,42 @@ export interface Ticket extends Usuario {
   emitidoEm: string;
 }
 
+export interface Partido {
+  nome: string;
+  digito: string;
+}
+
 export interface Candidato {
   id: number;
   nome: string;
-  partido: { nome: string; digito: string };
-  urlFoto: string;
+  /** null para "Anular" (voto nulo). */
+  partido: Partido | null;
+  urlFoto: string | null;
 }
 
 /** Item do array de GET /resultados. */
 export interface ContagemCandidato {
   candidatoId: number;
   nome: string;
-  partido: { nome: string; digito: string };
-  urlFoto: string;
+  /** null para "Anular" (voto nulo). */
+  partido: Partido | null;
+  urlFoto: string | null;
   votos: number;
+}
+
+/**
+ * GET /resultados devolve `{ id, qtdVotosTotal, ... }`, enquanto o resultado do voto
+ * (POST /votos) usa `{ candidatoId, votos, ... }`. Converte qualquer um dos dois formatos.
+ */
+export function normalizarContagem(lista: unknown): ContagemCandidato[] {
+  if (!Array.isArray(lista)) return [];
+  return lista.map((item: Record<string, unknown>) => ({
+    candidatoId: Number(item.candidatoId ?? item.idCandidato ?? item.id),
+    nome: String(item.nome ?? ""),
+    partido: (item.partido as Partido | null) ?? null,
+    urlFoto: (item.urlFoto as string | null) ?? null,
+    votos: Number(item.votos ?? item.qtdVotosTotal ?? item.votosTotais ?? 0),
+  }));
 }
 
 export interface Voto {

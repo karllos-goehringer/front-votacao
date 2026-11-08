@@ -9,11 +9,14 @@ export function ListaFila({
   usuarios,
   destacarId,
   acao,
+  ferramentas,
 }: {
   tipo: TipoFila;
   usuarios: UsuarioNaFila[];
   destacarId?: number;
   acao?: (u: UsuarioNaFila) => ReactNode;
+  /** Conteúdo extra logo abaixo do cabeçalho (ex.: botões de operações da fila). */
+  ferramentas?: ReactNode;
 }) {
   const cor = tipo === "PREFERENCIAL" ? "bg-preferencial" : "bg-comum";
 
@@ -26,6 +29,8 @@ export function ListaFila({
           {usuarios.length} {usuarios.length === 1 ? "pessoa" : "pessoas"}
         </span>
       </header>
+
+      {ferramentas && <div className="mb-3">{ferramentas}</div>}
 
       {usuarios.length === 0 ? (
         <p className="text-sm text-muted py-6 text-center">Ninguém aguardando</p>

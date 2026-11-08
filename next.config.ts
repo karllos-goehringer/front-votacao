@@ -1,7 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  // Libera o dev server para celulares/outros PCs da rede local (ex.: http://192.168.0.144:3000).
+  allowedDevOrigins: ["192.168.0.144", "192.168.*.*", "10.*.*.*"],
   cacheComponents: true,
   partialPrefetching: true,
   turbopack: {

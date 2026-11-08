@@ -88,8 +88,8 @@ function Cabine() {
             >
               <FotoCandidato id={c.id} nome={c.nome} urlFoto={c.urlFoto} className="size-28 text-6xl mx-auto" />
               <p className="mt-4 text-xl font-semibold">{c.nome}</p>
-              <p className="text-sm text-muted">{c.partido.nome}</p>
-              <p className={`mt-2 font-mono text-3xl font-bold tabular-nums ${cor.texto}`}>{c.partido.digito}</p>
+              <p className="text-sm text-muted">{c.partido?.nome ?? "Voto nulo"}</p>
+              <p className={`mt-2 font-mono text-3xl font-bold tabular-nums ${cor.texto}`}>{c.partido?.digito ?? "—"}</p>
             </button>
           );
         })}

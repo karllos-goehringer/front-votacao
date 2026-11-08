@@ -86,7 +86,13 @@ function CartaoCandidato({ candidato: c, total, seuVoto }: { candidato: Contagem
         <div className="min-w-0">
           <h2 className="text-lg font-semibold truncate">{c.nome}</h2>
           <p className="text-sm text-muted">
-            {c.partido.nome} · <span className="font-mono">{c.partido.digito}</span>
+            {c.partido ? (
+              <>
+                {c.partido.nome} · <span className="font-mono">{c.partido.digito}</span>
+              </>
+            ) : (
+              "Voto nulo"
+            )}
           </p>
           {seuVoto && (
             <span className={`inline-block mt-1 text-xs font-medium px-2 py-0.5 rounded-full ${cor.suave} ${cor.texto}`}>
