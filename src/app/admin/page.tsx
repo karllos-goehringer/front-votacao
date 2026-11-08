@@ -110,6 +110,17 @@ function Admin() {
     },
     { rotulo: "Encher fila (+30)", metodo: "POST", rota: "/fila/mock", acao: () => void executar("POST", "/fila/mock"), dica: "Coloca 30 pessoas de demonstração na fila; elas votam sozinhas quando chamadas" },
     {
+      rotulo: "Reiniciar do zero",
+      metodo: "POST",
+      rota: "/fila/reiniciar",
+      acao: () => {
+        if (confirm("Recomeçar do zero? Apaga a fila, a cabine e TODOS os votos, e enche a fila de novo.")) {
+          void executar("POST", "/fila/reiniciar");
+        }
+      },
+      dica: "Esvazia filas e cabine, apaga os votos, volta as senhas para P001/C001 e enche a fila de novo",
+    },
+    {
       rotulo: "Resultados parciais",
       metodo: "GET",
       rota: "/resultados",
