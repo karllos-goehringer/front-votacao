@@ -1,26 +1,105 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  color-scheme: light;
+  --background: #f6f7f9;
+  --foreground: #14171c;
+  --card: #ffffff;
+  --muted: #5d6573;
+  --border: #e2e5ea;
+  --primary: #1f5eff;
+  --primary-foreground: #ffffff;
+  --preferencial: #b45309;
+  --preferencial-soft: #fef3c7;
+  --comum: #0e7490;
+  --comum-soft: #cffafe;
+  --success: #15803d;
+  --success-soft: #dcfce7;
+  --danger: #b91c1c;
+  --danger-soft: #fee2e2;
+  --candidato-a: #6d28d9;
+  --candidato-a-soft: #ede9fe;
+  --candidato-b: #c2410c;
+  --candidato-b-soft: #ffedd5;
+}
+
+/* Tema escuro: escolhido no botão do cabeçalho (data-theme="dark").
+   O script do layout sempre define data-theme (o padrão é "light"); o bloco
+   @media abaixo só vale quando ele não roda (JavaScript desligado). */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --background: #0d0f13;
+  --foreground: #eceef2;
+  --card: #161920;
+  --muted: #9aa2b1;
+  --border: #272b35;
+  --primary: #5b8cff;
+  --primary-foreground: #0d0f13;
+  --preferencial: #fbbf24;
+  --preferencial-soft: #3a2a07;
+  --comum: #22d3ee;
+  --comum-soft: #08303a;
+  --success: #4ade80;
+  --success-soft: #0d2e1a;
+  --danger: #f87171;
+  --danger-soft: #3a1212;
+  --candidato-a: #a78bfa;
+  --candidato-a-soft: #2a1d4a;
+  --candidato-b: #fb923c;
+  --candidato-b-soft: #3d1d0a;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    color-scheme: dark;
+    --background: #0d0f13;
+    --foreground: #eceef2;
+    --card: #161920;
+    --muted: #9aa2b1;
+    --border: #272b35;
+    --primary: #5b8cff;
+    --primary-foreground: #0d0f13;
+    --preferencial: #fbbf24;
+    --preferencial-soft: #3a2a07;
+    --comum: #22d3ee;
+    --comum-soft: #08303a;
+    --success: #4ade80;
+    --success-soft: #0d2e1a;
+    --danger: #f87171;
+    --danger-soft: #3a1212;
+    --candidato-a: #a78bfa;
+    --candidato-a-soft: #2a1d4a;
+    --candidato-b: #fb923c;
+    --candidato-b-soft: #3d1d0a;
+  }
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-muted: var(--muted);
+  --color-border: var(--border);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-preferencial: var(--preferencial);
+  --color-preferencial-soft: var(--preferencial-soft);
+  --color-comum: var(--comum);
+  --color-comum-soft: var(--comum-soft);
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-candidato-a: var(--candidato-a);
+  --color-candidato-a-soft: var(--candidato-a-soft);
+  --color-candidato-b: var(--candidato-b);
+  --color-candidato-b-soft: var(--candidato-b-soft);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  transition: background-color 0.2s, color 0.2s;
 }
