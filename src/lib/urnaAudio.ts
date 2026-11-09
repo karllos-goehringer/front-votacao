@@ -1,19 +1,119 @@
 /**
- * Utilitário de reprodução do som característico de confirmação da urna eletrônica brasileira ("pilili").
+ * Utilitário de reprodução dos sons característicos da urna eletrônica brasileira.
  *
  * Prioridades:
- * 1. Toca arquivos estáticos colocados pelo usuário em /audio/ (suporta .mp3 e .wav).
+ * 1. Toca arquivos estáticos colocados em /audio/ (suporta .mp3 e .wav).
  * 2. Em caso de ausência ou bloqueio, executa fallback automático para síntese via Web Audio API.
  */
 
+let audioBeepInstancia: HTMLAudioElement | null = null;
+let audioConfirmaInstancia: HTMLAudioElement | null = null;
+
+/**
+ * Utilitário de reprodução do som de bipe de tecla/seleção da urna eletrônica.
+ * Executado ao selecionar candidatos ou voto nulo.
+ */
+/**
+ * Utilitário de reprodução do som de bipe de tecla/seleção da urna eletrônica.
+ * Executado ao selecionar candidatos ou voto nulo.
+ */
+export async function tocarBeepUrna(): Promise<void> {
+  if (typeof window === "undefined") return;
+
+  try {
+    if (!audioBeepInstancia) {
+      audioBeepInstancia = new Audio("/audio/urna-beep.wav");
+      audioBeepInstancia.preload = "auto";
+    }
+    audioBeepInstancia.currentTime = 0;
+    const promessa = audioBeepInstancia.play();
+    if (promessa !== undefined) {
+      await promessa;
+      return;
+    }
+  } catch {
+    // Tenta fallback com nova instância ou formatos alternativos
+  }
+
+  const fontes = [
+    "/audio/urna-beep.wav",
+    "/audio/urna-beep.mp3",
+  ];
+
+  for (const src of fontes) {
+    try {
+      const audio = new Audio(src);
+      audio.preload = "auto";
+      const promessa = audio.play();
+      if (promessa !== undefined) {
+        await promessa;
+        return;
+      }
+    } catch {
+      // Segue para a próxima fonte caso ocorra falha
+    }
+  }
+
+  // Fallback via Web Audio API caso o arquivo de áudio falhe
+  try {
+    const AudioContextClass =
+      window.AudioContext ||
+      (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+    if (!AudioContextClass) return;
+
+    const ctx = new AudioContextClass();
+    if (ctx.state === "suspended") {
+      await ctx.resume();
+    }
+
+    const t0 = ctx.currentTime;
+    const duracao = 0.08;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(1000, t0);
+
+    gain.gain.setValueAtTime(0, t0);
+    gain.gain.linearRampToValueAtTime(0.3, t0 + 0.01);
+    gain.gain.setValueAtTime(0.3, t0 + duracao - 0.02);
+    gain.gain.linearRampToValueAtTime(0.001, t0 + duracao);
+
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+
+    osc.start(t0);
+    osc.stop(t0 + duracao);
+  } catch {
+    // Silencia qualquer exceção
+  }
+}
+
+/**
+ * Utilitário de reprodução do som característico de confirmação da urna eletrônica brasileira ("pilili").
+ */
 export async function tocarSomUrna(): Promise<void> {
   if (typeof window === "undefined") return;
+
+  try {
+    if (!audioConfirmaInstancia) {
+      audioConfirmaInstancia = new Audio("/audio/urna-confirma.wav");
+      audioConfirmaInstancia.preload = "auto";
+    }
+    audioConfirmaInstancia.currentTime = 0;
+    const promessa = audioConfirmaInstancia.play();
+    if (promessa !== undefined) {
+      await promessa;
+      return;
+    }
+  } catch {
+    // Tenta fallback com nova instância ou formatos alternativos
+  }
 
   // 1. Tenta reproduzir arquivo de áudio estático (prioriza .mp3 se o usuário fornecer, seguido do .wav nativo)
   const fontes = [
     "/audio/urna-confirma.mp3",
     "/audio/urna-confirma.wav",
-    "/audio/urna-beep.wav",
   ];
 
   for (const src of fontes) {

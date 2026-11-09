@@ -8,7 +8,7 @@ import { api } from "@/lib/api";
 import { useFila } from "@/lib/fila/FilaProvider";
 import { useIrParaDestino } from "@/lib/fila/destino";
 import { duracao, ehNulo, type Candidato } from "@/lib/fila/tipos";
-import { tocarSomUrna } from "@/lib/urnaAudio";
+import { tocarBeepUrna, tocarSomUrna } from "@/lib/urnaAudio";
 
 export default function VotarPage() {
   return (
@@ -40,6 +40,11 @@ function Cabine() {
   }
 
   const escolha = candidatos?.find((c) => c.id === escolhido);
+
+  function selecionar(id: number) {
+    setEscolhido(id);
+    void tocarBeepUrna();
+  }
 
   async function confirmar() {
     if (!escolha || enviando) return;
@@ -88,7 +93,7 @@ function Cabine() {
               type="button"
               role="radio"
               aria-checked={marcado}
-              onClick={() => setEscolhido(c.id)}
+              onClick={() => selecionar(c.id)}
               disabled={enviando}
               className={`rounded-2xl border-2 bg-card p-6 text-center transition ${
                 marcado ? `${cor.borda} ring-4 ${cor.anel}` : "border-border hover:border-muted"
@@ -111,7 +116,7 @@ function Cabine() {
               type="button"
               role="radio"
               aria-checked={marcado}
-              onClick={() => setEscolhido(c.id)}
+              onClick={() => selecionar(c.id)}
               disabled={enviando}
               className={`sm:col-span-2 flex items-center gap-4 rounded-2xl border-2 px-5 py-4 text-left transition ${
                 marcado ? "border-nulo bg-nulo-soft ring-4 ring-nulo/20" : "border-dashed border-border bg-card hover:border-muted"
