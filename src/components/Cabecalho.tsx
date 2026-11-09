@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { BotaoTema } from "@/components/BotaoTema";
-import { SoNoNavegador } from "@/components/SoNoNavegador";
+import { SoNoNavegador, useMontado } from "@/components/SoNoNavegador";
 import { useAdmin } from "@/lib/admin/AdminProvider";
 import { useFila } from "@/lib/fila/FilaProvider";
 
@@ -16,14 +16,17 @@ const LINKS = [
 export function Cabecalho() {
   const pathname = usePathname();
   const { jaVotou } = useFila();
-  const links = jaVotou ? LINKS.filter((l) => l.href !== "/") : LINKS;
+  const montado = useMontado();
+
+  const jaVotouEfetivo = montado && jaVotou;
+  const links = jaVotouEfetivo ? LINKS.filter((l) => l.href !== "/") : LINKS;
 
   return (
     <>
       <header className="border-b border-border bg-card">
         <div className="max-w-6xl mx-auto px-4 h-14 flex items-center justify-between sm:justify-start gap-3 sm:gap-4">
           <Link
-            href={jaVotou ? "/resultados" : "/"}
+            href={jaVotouEfetivo ? "/resultados" : "/"}
             className="font-semibold tracking-tight whitespace-nowrap text-base sm:text-lg"
           >
             Cabine de Votação
@@ -61,6 +64,9 @@ export function Cabecalho() {
 function NavBottom() {
   const pathname = usePathname();
   const { jaVotou } = useFila();
+  const montado = useMontado();
+
+  const jaVotouEfetivo = montado && jaVotou;
 
   return (
     <nav
@@ -68,7 +74,7 @@ function NavBottom() {
       className="fixed left-1/2 -translate-x-1/2 z-50 sm:hidden flex items-center gap-1 p-1.5 rounded-full bg-card/80 dark:bg-card/75 backdrop-blur-xl border border-border/80 shadow-lg shadow-black/10 max-w-[calc(100vw-2rem)] transition-all"
       style={{ bottom: "max(1rem, env(safe-area-inset-bottom))" }}
     >
-      {!jaVotou && (
+      {!jaVotouEfetivo && (
         <ItemNavBottom
           href="/"
           rotulo="Início"

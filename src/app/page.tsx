@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
-import { SoNoNavegador } from "@/components/SoNoNavegador";
+import { SoNoNavegador, useMontado } from "@/components/SoNoNavegador";
 import { useAdmin } from "@/lib/admin/AdminProvider";
 import { useFila } from "@/lib/fila/FilaProvider";
 import { useIrParaDestino } from "@/lib/fila/destino";
@@ -11,15 +11,16 @@ import { useIrParaDestino } from "@/lib/fila/destino";
 export default function Home() {
   const { jaVotou } = useFila();
   const router = useRouter();
+  const montado = useMontado();
 
   useEffect(() => {
-    if (jaVotou) {
+    if (montado && jaVotou) {
       router.replace("/resultados");
     }
-  }, [jaVotou, router]);
+  }, [montado, jaVotou, router]);
 
   // Se já votou, não exibe a tela de início e redireciona para os resultados
-  if (jaVotou) {
+  if (montado && jaVotou) {
     return <p className="text-muted text-center py-20">Redirecionando para os resultados…</p>;
   }
   return (

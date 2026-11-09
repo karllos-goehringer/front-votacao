@@ -36,12 +36,7 @@ function Resultados() {
   const aoVivo = status === "conectado" && sincronizado;
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
-      {comprovante && (
-        <p className="rounded-xl bg-success-soft text-success px-4 py-3 font-semibold" role="status">
-          ✓ Voto registrado! Obrigado por votar.
-        </p>
-      )}
+    <div className="max-w-4xl mx-auto space-y-6"
 
       <div className="flex flex-wrap items-end gap-3">
         <div>
@@ -211,27 +206,14 @@ function Comprovante({ candidatos }: { candidatos?: Candidato[] | null }) {
             <h2 className="font-bold text-lg sm:text-xl tracking-tight text-foreground">
               Comprovante de votação
             </h2>
-            <span className="inline-flex sm:hidden items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-success-soft text-success border border-success/30 shrink-0">
-              <svg className="size-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <polyline points="20 6 9 17 4 12" />
-              </svg>
-              Confirmado
-            </span>
           </div>
           <p className="text-xs sm:text-sm text-muted mt-0.5">
             Voto autenticado e registrado com sucesso na urna eletrônica
           </p>
         </div>
-
-        <span className="hidden sm:inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-bold bg-success-soft text-success shrink-0 border border-success/30 shadow-xs">
-          <svg className="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <polyline points="20 6 9 17 4 12" />
-          </svg>
-          Status: Confirmado
-        </span>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-[16rem_1fr] items-start">
+      <div className="grid gap-6 md:grid-cols-[18rem_1fr] items-start">
         {/* Identificação visual do candidato ou voto nulo */}
         <div className="flex items-center gap-3.5 p-3.5 rounded-xl bg-background/70 border border-border/80 w-full">
           <FotoCandidato

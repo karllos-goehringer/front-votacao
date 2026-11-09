@@ -1,7 +1,18 @@
 "use client";
 
-import { Suspense, use, type ReactNode } from "react";
+import { Suspense, use, useSyncExternalStore, type ReactNode } from "react";
 import { browser } from "react-dom";
+
+const subVazio = () => () => {};
+
+/** Retorna true apenas após a hidratação no navegador, evitando mismatch de SSR. */
+export function useMontado(): boolean {
+  return useSyncExternalStore(
+    subVazio,
+    () => true,
+    () => false,
+  );
+}
 
 function Portao({ children }: { children: ReactNode }) {
   use(browser("Depende da sessão salva no localStorage"));

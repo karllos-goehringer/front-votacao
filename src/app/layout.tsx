@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Script from "next/script";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Cabecalho } from "@/components/Cabecalho";
 import { AdminProvider } from "@/lib/admin/AdminProvider";
@@ -32,7 +33,11 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     >
       <head>
         {/* Aplica o tema salvo antes da primeira pintura (sem piscar). */}
-        <script dangerouslySetInnerHTML={{ __html: SCRIPT_TEMA }} />
+        <Script
+          id="script-tema"
+          strategy="beforeInteractive"
+          dangerouslySetInnerHTML={{ __html: SCRIPT_TEMA }}
+        />
       </head>
       <body className="min-h-full flex flex-col font-sans">
         <FilaProvider>
