@@ -36,8 +36,7 @@ function Resultados() {
   const aoVivo = status === "conectado" && sincronizado;
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6"
-
+    <div className="max-w-4xl mx-auto space-y-6">
       <div className="flex flex-wrap items-end gap-3">
         <div>
           <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight">Resultados parciais</h1>
@@ -128,9 +127,8 @@ function CartaoNulo({ contagem: c, total, seuVoto }: { contagem: ContagemCandida
   const pct = total ? (c.votos / total) * 100 : 0;
   return (
     <section
-      className={`sm:col-span-2 rounded-2xl border-2 p-4 ${
-        seuVoto ? "border-nulo bg-nulo-soft ring-4 ring-nulo/20" : "border-dashed border-border bg-card"
-      }`}
+      className={`sm:col-span-2 rounded-2xl border-2 p-4 ${seuVoto ? "border-nulo bg-nulo-soft ring-4 ring-nulo/20" : "border-dashed border-border bg-card"
+        }`}
     >
       <div className="flex items-center gap-3">
         <FotoCandidato id={c.candidatoId} nome={c.nome} nulo className="size-10 text-2xl shrink-0" />
