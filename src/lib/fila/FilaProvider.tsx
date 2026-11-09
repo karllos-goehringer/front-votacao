@@ -42,6 +42,8 @@ interface FilaContexto {
   situacao: SituacaoTicket | null;
   /** Indica se este navegador já concluiu seu voto nesta eleição. */
   jaVotou: boolean;
+  /** Indica se o status do dispositivo foi validado contra o banco (GET /dispositivo/status). */
+  dispositivoVerificado: boolean;
   /** Comprovante do voto deste navegador (existe entre votar e clicar em Concluir). */
   comprovante: Comprovante | null;
   /** Quantidade absoluta de votos de cada candidato (GET /resultados), atualizada ao vivo. */
@@ -68,6 +70,10 @@ export function FilaProvider({ children }: { children: ReactNode }) {
   const [meuTicket, setMeuTicket] = useState<Ticket | null>(() => (noNavegador ? lerTicket() : null));
   const [comprovante, setComprovante] = useState<Comprovante | null>(() => (noNavegador ? lerComprovante() : null));
   const [jaVotou, setJaVotou] = useState<boolean>(() => (noNavegador ? lerJaVotou() || Boolean(lerComprovante()) : false));
+  const [dispositivoVerificado, setDispositivoVerificado] = useState<boolean>(() => {
+    if (!noNavegador) return false;
+    return !lerJaVotou() && !lerComprovante();
+  });
   const [resultado, setResultadoBruto] = useState<ContagemCandidato[] | null>(null);
   const [resultadoEm, setResultadoEm] = useState<string | null>(null);
   const [erroResultado, setErroResultado] = useState<string | null>(null);
@@ -87,17 +93,27 @@ export function FilaProvider({ children }: { children: ReactNode }) {
     // Sincroniza o status do dispositivo com a verdade autoritativa do banco de dados (GET /dispositivo/status)
     const sincronizarStatusDispositivo = async () => {
       try {
-        const r = await api<{ jaVotou: boolean }>("/dispositivo/status");
-        if (r.data && typeof r.data.jaVotou === "boolean") {
-          if (r.data.jaVotou) {
+        const r = await api<{ jaVotou: boolean; bloqueadoParaCadastro?: boolean }>("/dispositivo/status");
+        if (r.data && (typeof r.data.jaVotou === "boolean" || typeof r.data.bloqueadoParaCadastro === "boolean")) {
+          const travado = Boolean(r.data.jaVotou || r.data.bloqueadoParaCadastro);
+          if (travado) {
             // Se o backend confirma que este dispositivo físico/IP já votou no banco oficial,
             // marca jaVotou como true (impede votação duplicada mesmo sem comprovante em abas anônimas)
             setJaVotou(true);
             gravarJaVotou(true);
+          } else {
+            // Se o backend autoritativo confirma que este dispositivo NÃO votou no banco atual
+            // (ex: banco resetado, nova eleição ou este dispositivo ainda não votou):
+            setJaVotou(false);
+            gravarJaVotou(false);
+            setComprovante(null);
+            gravarComprovante(null);
           }
         }
       } catch {
         // Se a rota falhar ou backend indisponível, mantém o estado atual
+      } finally {
+        setDispositivoVerificado(true);
       }
     };
 
@@ -166,11 +182,26 @@ export function FilaProvider({ children }: { children: ReactNode }) {
     };
     window.addEventListener("storage", aoMudarStorage);
 
+    // Revalida imediatamente ao voltar para a aba do navegador
+    const aoReativarAba = () => {
+      void sincronizarStatusDispositivo();
+      void atualizarResultado();
+    };
+    window.addEventListener("focus", aoReativarAba);
+    const aoMudarVisibilidade = () => {
+      if (document.visibilityState === "visible") {
+        aoReativarAba();
+      }
+    };
+    document.addEventListener("visibilitychange", aoMudarVisibilidade);
+
     return () => {
       pararEstado();
       pararStatus();
       pararVoto();
       window.removeEventListener("storage", aoMudarStorage);
+      window.removeEventListener("focus", aoReativarAba);
+      document.removeEventListener("visibilitychange", aoMudarVisibilidade);
       socket.fechar();
       socketRef.current = null;
     };
@@ -253,6 +284,7 @@ export function FilaProvider({ children }: { children: ReactNode }) {
       meuTicket,
       situacao,
       jaVotou,
+      dispositivoVerificado,
       comprovante,
       resultado,
       resultadoEm,
@@ -262,7 +294,7 @@ export function FilaProvider({ children }: { children: ReactNode }) {
       votar,
       concluir,
     }),
-    [estado, status, sincronizado, meuTicket, situacao, jaVotou, comprovante, resultado, resultadoEm, erroResultado, entrar, sairDaFila, votar, concluir],
+    [estado, status, sincronizado, meuTicket, situacao, jaVotou, dispositivoVerificado, comprovante, resultado, resultadoEm, erroResultado, entrar, sairDaFila, votar, concluir],
   );
 
   return <Contexto value={valor}>{children}</Contexto>;

@@ -9,19 +9,26 @@ import { useFila } from "@/lib/fila/FilaProvider";
 import { useIrParaDestino } from "@/lib/fila/destino";
 
 export default function Home() {
-  const { jaVotou } = useFila();
+  const { jaVotou, dispositivoVerificado } = useFila();
   const router = useRouter();
   const montado = useMontado();
 
+  const jaVotouConfirmado = montado && jaVotou && dispositivoVerificado;
+
   useEffect(() => {
-    if (montado && jaVotou) {
+    if (jaVotouConfirmado) {
       router.replace("/resultados");
     }
-  }, [montado, jaVotou, router]);
+  }, [jaVotouConfirmado, router]);
 
-  // Se já votou, não exibe a tela de início e redireciona para os resultados
-  if (montado && jaVotou) {
+  // Se já votou (confirmado pelo backend), não exibe a tela de início e redireciona
+  if (jaVotouConfirmado) {
     return <p className="text-muted text-center py-20">Redirecionando para os resultados…</p>;
+  }
+
+  // Enquanto valida o status com o endpoint (evita falso-positivo após reset do banco)
+  if (montado && jaVotou && !dispositivoVerificado) {
+    return <p className="text-muted text-center py-20">Verificando situação do eleitor…</p>;
   }
   return (
     <div className="max-w-xl mx-auto py-6 sm:py-12 space-y-8 text-center">
