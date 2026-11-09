@@ -21,7 +21,7 @@ export default function ResultadosPage() {
 }
 
 function Resultados() {
-  const { resultado, resultadoEm, erroResultado, comprovante, status, sincronizado } = useFila();
+  const { resultado, resultadoEm, erroResultado, comprovante, dispositivoVerificado, status, sincronizado } = useFila();
   const [candidatos, setCandidatos] = useState<Candidato[] | null>(null);
 
   useEffect(() => {
@@ -30,9 +30,10 @@ function Resultados() {
       .catch(() => null);
   }, []);
 
-  const votouEm = comprovante?.voto.candidatoId;
+  const comprovanteValido = dispositivoVerificado ? comprovante : null;
+  const votouEm = comprovanteValido?.voto.candidatoId;
   // Enquanto o primeiro GET não volta, quem votou já tem o resultado do momento do voto.
-  const dados = resultado ?? comprovante?.resultado ?? null;
+  const dados = resultado ?? comprovanteValido?.resultado ?? null;
   const aoVivo = status === "conectado" && sincronizado;
 
   return (
@@ -72,7 +73,7 @@ function Resultados() {
         </>
       )}
 
-      {comprovante ? <Comprovante candidatos={candidatos} /> : <AcoesVisitante />}
+      {comprovanteValido ? <Comprovante candidatos={candidatos} /> : <AcoesVisitante />}
     </div>
   );
 }
@@ -255,8 +256,8 @@ function Comprovante({ candidatos }: { candidatos?: Candidato[] | null }) {
 }
 
 function AcoesVisitante() {
-  const { meuTicket, jaVotou, comprovante } = useFila();
-  if (jaVotou || Boolean(comprovante)) {
+  const { meuTicket, jaVotou, comprovante, dispositivoVerificado } = useFila();
+  if ((jaVotou || Boolean(comprovante)) && dispositivoVerificado) {
     return (
       <div className="rounded-xl border border-border/80 bg-card p-4 text-center sm:text-left flex flex-col sm:flex-row items-center justify-between gap-3">
         <p className="text-sm text-muted">

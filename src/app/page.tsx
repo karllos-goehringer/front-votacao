@@ -9,17 +9,23 @@ import { useFila } from "@/lib/fila/FilaProvider";
 import { useIrParaDestino } from "@/lib/fila/destino";
 
 export default function Home() {
-  const { jaVotou, comprovante } = useFila();
+  const { jaVotou, comprovante, dispositivoVerificado } = useFila();
   const router = useRouter();
   const montado = useMontado();
 
-  const jaVotouConfirmado = montado && (Boolean(comprovante) || jaVotou);
+  const temVotoLocal = Boolean(comprovante) || jaVotou;
+  const jaVotouConfirmado = montado && temVotoLocal && dispositivoVerificado;
 
   useEffect(() => {
     if (jaVotouConfirmado) {
       router.replace("/resultados");
     }
   }, [jaVotouConfirmado, router]);
+
+  // Aguarda a validação do endpoint /dispositivo/status antes de redirecionar caso haja estado antigo salvo
+  if (montado && temVotoLocal && !dispositivoVerificado) {
+    return <p className="text-muted text-center py-20">Verificando situação do eleitor…</p>;
+  }
 
   // Se já votou (comprovante ativo ou confirmado pelo backend), não exibe a tela de início e redireciona
   if (jaVotouConfirmado) {

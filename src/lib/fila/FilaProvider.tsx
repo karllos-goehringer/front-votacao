@@ -71,7 +71,11 @@ export function FilaProvider({ children }: { children: ReactNode }) {
   const [meuTicket, setMeuTicket] = useState<Ticket | null>(() => (noNavegador ? lerTicket() : null));
   const [comprovante, setComprovante] = useState<Comprovante | null>(() => (noNavegador ? lerComprovante() : null));
   const [jaVotou, setJaVotou] = useState<boolean>(() => (noNavegador ? lerJaVotou() || Boolean(lerComprovante()) : false));
-  const [dispositivoVerificado, setDispositivoVerificado] = useState<boolean>(true);
+  const [dispositivoVerificado, setDispositivoVerificado] = useState<boolean>(() => {
+    if (!noNavegador) return false;
+    return !lerJaVotou() && !lerComprovante();
+  });
+  const ultimoVotoLocalRef = useRef<number>(0);
   const [resultado, setResultadoBruto] = useState<ContagemCandidato[] | null>(null);
   const [resultadoEm, setResultadoEm] = useState<string | null>(null);
   const [erroResultado, setErroResultado] = useState<string | null>(null);
@@ -91,7 +95,9 @@ export function FilaProvider({ children }: { children: ReactNode }) {
     // Sincroniza o status do dispositivo com a verdade autoritativa do banco de dados (GET /dispositivo/status)
     const sincronizarStatusDispositivo = async () => {
       try {
-        const r = await api<{ jaVotou: boolean; bloqueadoParaCadastro?: boolean }>("/dispositivo/status");
+        const devToken = obterOuCriarDeviceToken();
+        const query = devToken ? `?token=${encodeURIComponent(devToken)}&_t=${Date.now()}` : `?_t=${Date.now()}`;
+        const r = await api<{ jaVotou: boolean; bloqueadoParaCadastro?: boolean }>(`/dispositivo/status${query}`);
         if (r.data && (typeof r.data.jaVotou === "boolean" || typeof r.data.bloqueadoParaCadastro === "boolean")) {
           const travado = Boolean(r.data.jaVotou || r.data.bloqueadoParaCadastro);
           if (travado) {
@@ -99,15 +105,14 @@ export function FilaProvider({ children }: { children: ReactNode }) {
             // marca jaVotou como true (impede votação duplicada mesmo sem comprovante em abas anônimas)
             setJaVotou(true);
             gravarJaVotou(true);
-          } else {
-            // Se o backend informa que o dispositivo não votou no banco:
-            // Só desmarca jaVotou se este eleitor NÃO possui um comprovante válido na sessão ativa.
-            // O comprovante recebido após votar NUNCA deve ser apagado pela sincronização em segundo plano!
-            const temComprovante = Boolean(lerComprovante());
-            if (!temComprovante) {
-              setJaVotou(false);
-              gravarJaVotou(false);
-            }
+          } else if (Date.now() - ultimoVotoLocalRef.current > 5000) {
+            // Se o backend informa que este dispositivo NÃO votou no banco atual (ex: após db:reset,
+            // mesmo que outros dispositivos já tenham votado e totalVotos > 0), limpa a flag jaVotou
+            // e eventual comprovante residual de eleição anterior para liberar o início e nova votação.
+            setJaVotou(false);
+            gravarJaVotou(false);
+            setComprovante(null);
+            gravarComprovante(null);
           }
         }
       } catch {
@@ -234,6 +239,8 @@ export function FilaProvider({ children }: { children: ReactNode }) {
       });
       const ticket: Ticket = { ...usuario, emitidoEm: new Date().toISOString() };
       definirComprovante(null);
+      gravarJaVotou(false);
+      setJaVotou(false);
       definirTicket(ticket);
       return ticket;
     },
@@ -266,6 +273,7 @@ export function FilaProvider({ children }: { children: ReactNode }) {
         resultado: normalizarContagem(r.data.resultado),
         tempoRequisicaoMs: r.tempoMs,
       };
+      ultimoVotoLocalRef.current = Date.now();
       definirComprovante(novo);
       setResultado(novo.resultado);
       gravarJaVotou(true);

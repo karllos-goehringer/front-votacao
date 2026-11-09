@@ -17,12 +17,17 @@ export default function EntrarPage() {
 }
 
 function Conteudo() {
-  const { meuTicket, jaVotou, comprovante } = useFila();
+  const { meuTicket, jaVotou, comprovante, dispositivoVerificado } = useFila();
   // Chegou a vez (o servidor avisou pelo WebSocket) → vai para a tela de voto.
   // Se já votou, o destino é /resultados.
   useIrParaDestino("/entrar", ["/entrar", null]);
 
-  if (Boolean(comprovante) || jaVotou) {
+  const temVotoLocal = Boolean(comprovante) || jaVotou;
+  if (temVotoLocal && !dispositivoVerificado) {
+    return <p className="text-muted text-center py-20">Verificando situação do eleitor…</p>;
+  }
+
+  if (temVotoLocal && dispositivoVerificado) {
     return <p className="text-muted text-center py-20">Você já votou nesta eleição. Redirecionando para os resultados…</p>;
   }
 

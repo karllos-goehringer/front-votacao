@@ -9,8 +9,8 @@ import { useFila } from "./FilaProvider";
  * já votou → resultados parciais; está na cabine → votar; está na fila → entrar (tela de espera).
  */
 export function useDestinoEleitor(): "/resultados" | "/votar" | "/entrar" | null {
-  const { meuTicket, comprovante, situacao, jaVotou } = useFila();
-  if (comprovante || jaVotou) return "/resultados";
+  const { meuTicket, comprovante, situacao, jaVotou, dispositivoVerificado } = useFila();
+  if ((comprovante || jaVotou) && dispositivoVerificado) return "/resultados";
   if (!meuTicket) return null;
   if (situacao?.tipo === "na-cabine") return "/votar";
   return "/entrar";
