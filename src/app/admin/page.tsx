@@ -323,7 +323,11 @@ function Admin() {
       <div className="grid gap-4 lg:grid-cols-[1fr_24rem] items-start">
         <ControleCabine
           naCabine={estado?.naCabine ?? null}
-          proximo={estado ? (estado.preferencial[0] ?? estado.comum[0] ?? null) : null}
+          proximo={
+            estado
+              ? ([...estado.preferencial, ...estado.comum].sort((a, b) => a.aFrente - b.aFrente)[0] ?? null)
+              : null
+          }
           aguardando={aguardando}
           ocupado={ocupado}
           mockInicializado={mockInicializado}

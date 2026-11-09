@@ -158,8 +158,10 @@ function MinhaSenha() {
               </p>
               <p className="text-sm mt-3">
                 {situacao.aFrente === 0
-                  ? "Você é o próximo! Aguarde o administrador chamar a sua senha."
-                  : "Aguarde o administrador chamar a sua senha."}
+                  ? "Você é o próximo! Aguarde a liberação da cabine."
+                  : situacao.aFrente === 1 && estado?.naCabine
+                    ? "Você é o próximo! Sua cabine abrirá assim que o eleitor atual concluir o voto."
+                    : "Aguarde a sua vez na fila."}
               </p>
               {estado?.naCabine && (
                 <p className="text-xs text-muted mt-3">
@@ -201,8 +203,16 @@ function MinhaSenha() {
 
       {estado && (
         <div className="grid gap-4 sm:grid-cols-2">
-          <ListaFila tipo="PREFERENCIAL" usuarios={estado.preferencial} destacarId={meuTicket.id} />
-          <ListaFila tipo="COMUM" usuarios={estado.comum} destacarId={meuTicket.id} />
+          <ListaFila
+            tipo="PREFERENCIAL"
+            usuarios={estado.preferencial}
+            destacarId={meuTicket.tipoFila === "PREFERENCIAL" ? meuTicket.id : undefined}
+          />
+          <ListaFila
+            tipo="COMUM"
+            usuarios={estado.comum}
+            destacarId={meuTicket.tipoFila === "COMUM" ? meuTicket.id : undefined}
+          />
         </div>
       )}
     </div>

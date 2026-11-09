@@ -17,7 +17,7 @@ function Painel() {
   const { estado } = useFila();
   if (!estado) return <p className="text-muted text-center py-20">Aguardando dados do servidor…</p>;
 
-  const proximo = estado.preferencial[0] ?? estado.comum[0];
+  const proximo = [...estado.preferencial, ...estado.comum].sort((a, b) => a.aFrente - b.aFrente)[0] ?? null;
   const anteriores = estado.ultimosChamados.filter((u) => u.id !== estado.naCabine?.id);
 
   return (

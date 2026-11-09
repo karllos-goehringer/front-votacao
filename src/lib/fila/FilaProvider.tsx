@@ -76,6 +76,7 @@ export function FilaProvider({ children }: { children: ReactNode }) {
     return !lerJaVotou() && !lerComprovante();
   });
   const ultimoVotoLocalRef = useRef<number>(0);
+  const ultimoTicketLocalRef = useRef<number>(0);
   const [resultado, setResultadoBruto] = useState<ContagemCandidato[] | null>(null);
   const [resultadoEm, setResultadoEm] = useState<string | null>(null);
   const [erroResultado, setErroResultado] = useState<string | null>(null);
@@ -128,24 +129,42 @@ export function FilaProvider({ children }: { children: ReactNode }) {
           const normalizado = normalizarContagem(r.data);
           setResultado(normalizado);
           const totalVotos = normalizado.reduce((acc, c) => acc + (c.votos || 0), 0);
-          if (totalVotos === 0) {
+          if (totalVotos === 0 && Date.now() - ultimoVotoLocalRef.current > 5000) {
             // Se o total de votos no banco for 0 (ex: após db:reset ou reiniciar fila),
-            // limpa o voto, comprovante e senha deste eleitor para liberar nova votação e reexibir o início
+            // limpa o voto e comprovante concluídos anteriormente para liberar nova votação.
+            // IMPORTANTE: NUNCA apagar meuTicket aqui, pois antes do 1º voto da eleição ser computado
+            // totalVotos também é 0 enquanto o 1º eleitor está votando na cabine e outros entram na fila!
             setJaVotou(false);
             setComprovante(null);
-            setMeuTicket(null);
             gravarJaVotou(false);
             gravarComprovante(null);
-            gravarTicket(null);
           }
         })
         .catch((err: unknown) => setErroResultado(err instanceof Error ? err.message : "Falha ao buscar resultados"));
+
+    const verificarTicketOrfao = (novoEstado: FilaEstado) => {
+      // Se o servidor informa que a cabine e ambas as filas estão totalmente vazias (ex: após db:reset),
+      // remove eventual ticket residual de sessão anterior (respeitando janela de criação recente).
+      if (
+        !novoEstado.naCabine &&
+        novoEstado.preferencial.length === 0 &&
+        novoEstado.comum.length === 0 &&
+        Date.now() - ultimoTicketLocalRef.current > 5000
+      ) {
+        const ticketSalvo = lerTicket();
+        if (ticketSalvo && Date.now() - new Date(ticketSalvo.emitidoEm).getTime() > 5000) {
+          setMeuTicket(null);
+          gravarTicket(null);
+        }
+      }
+    };
 
     // Busca o estado inicial atualizado diretamente da API e valida o dispositivo
     api<FilaEstado>("/fila")
       .then((r) => {
         setEstado(r.data);
         setSincronizado(true);
+        verificarTicketOrfao(r.data);
       })
       .catch(() => undefined);
 
@@ -155,6 +174,7 @@ export function FilaProvider({ children }: { children: ReactNode }) {
     const pararEstado = socket.onEstado((novo) => {
       setEstado(novo);
       setSincronizado(true);
+      verificarTicketOrfao(novo);
       // Se a cabine e filas estiverem vazias (ex: reset ou restart de fila), revalida com o banco
       if (!novo.naCabine && novo.preferencial.length === 0 && novo.comum.length === 0) {
         void sincronizarStatusDispositivo();
@@ -238,6 +258,7 @@ export function FilaProvider({ children }: { children: ReactNode }) {
         tokenDispositivo: devToken,
       });
       const ticket: Ticket = { ...usuario, emitidoEm: new Date().toISOString() };
+      ultimoTicketLocalRef.current = Date.now();
       definirComprovante(null);
       gravarJaVotou(false);
       setJaVotou(false);
@@ -287,11 +308,14 @@ export function FilaProvider({ children }: { children: ReactNode }) {
   );
 
   const concluir = useCallback(() => {
+    const tinhaComprovante = Boolean(lerComprovante());
     definirComprovante(null);
     definirTicket(null);
-    gravarJaVotou(true);
-    setJaVotou(true);
-    setDispositivoVerificado(true);
+    if (tinhaComprovante) {
+      gravarJaVotou(true);
+      setJaVotou(true);
+      setDispositivoVerificado(true);
+    }
   }, [definirComprovante, definirTicket]);
 
   const situacao = useMemo(
@@ -329,6 +353,16 @@ export function useFila(): FilaContexto {
   return ctx;
 }
 
+function mesmoEleitor(u: Usuario | null | undefined, ticket: Ticket): boolean {
+  if (!u) return false;
+  return (
+    u.id === ticket.id &&
+    u.tipoFila === ticket.tipoFila &&
+    u.senha === ticket.senha &&
+    u.nome === ticket.nome
+  );
+}
+
 /** Onde está a minha senha? O servidor já manda quantas pessoas cada um tem à frente. */
 function calcularSituacao(
   estado: FilaEstado | null,
@@ -339,9 +373,9 @@ function calcularSituacao(
 ): SituacaoTicket {
   if (comprovante || jaVotou) return { tipo: "votou" };
   if (!estado) return { tipo: "desconhecida" };
-  if (estado.naCabine?.id === ticket.id) return { tipo: "na-cabine" };
+  if (mesmoEleitor(estado.naCabine, ticket)) return { tipo: "na-cabine" };
 
-  const eu = [...estado.preferencial, ...estado.comum].find((u) => u.id === ticket.id);
+  const eu = [...estado.preferencial, ...estado.comum].find((u) => mesmoEleitor(u, ticket));
   if (eu) return { tipo: "aguardando", posicao: eu.posicaoNaFila, aFrente: eu.aFrente };
 
   // Com o cache local não dá para afirmar que saiu da fila; espera o servidor.

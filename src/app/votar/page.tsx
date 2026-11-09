@@ -13,9 +13,19 @@ import { tocarBeepUrna, tocarSomUrna } from "@/lib/urnaAudio";
 export default function VotarPage() {
   return (
     <SoNoNavegador>
-      <Cabine />
+      <CabineContainer />
     </SoNoNavegador>
   );
+}
+
+function CabineContainer() {
+  const { meuTicket, estado } = useFila();
+  // Chave única por ticket e chamada garante que cada eleitor sempre receba uma Cabine limpa
+  // (sem candidato pré-selecionado nem botão CONFIRMA travado em "GRAVANDO…" do Router Cache).
+  const chaveSessao = meuTicket
+    ? `${meuTicket.id}-${meuTicket.tipoFila}-${meuTicket.senha}-${meuTicket.chave}-${estado?.naCabine?.chamadoEm ?? ""}`
+    : "sem-ticket";
+  return <Cabine key={chaveSessao} />;
 }
 
 function Cabine() {
@@ -25,9 +35,16 @@ function Cabine() {
   const [escolhido, setEscolhido] = useState<number | null>(null);
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
+  const [prontoParaInteragir, setProntoParaInteragir] = useState(false);
 
   // Só fica aqui quem está na cabine; depois do voto vai para os resultados parciais.
   useIrParaDestino("/votar", ["/votar", "/resultados"]);
+
+  // Protege contra clique fantasma (touch bleed-through) imediatamente na transição de tela para a cabine
+  useEffect(() => {
+    const timer = setTimeout(() => setProntoParaInteragir(true), 250);
+    return () => clearTimeout(timer);
+  }, []);
 
   useEffect(() => {
     api<Candidato[]>("/candidatos")
@@ -35,19 +52,21 @@ function Cabine() {
       .catch((err) => setErro(mensagemDeErro(err)));
   }, []);
 
-  if (!meuTicket || situacao?.tipo !== "na-cabine") {
+  if ((!meuTicket || situacao?.tipo !== "na-cabine") && !enviando) {
     return <p className="text-muted text-center py-20">Verificando a sua vez…</p>;
   }
 
   const escolha = candidatos?.find((c) => c.id === escolhido);
+  const eleitorCabine = meuTicket ?? estado?.naCabine ?? null;
 
   function selecionar(id: number) {
+    if (enviando || !prontoParaInteragir) return;
     setEscolhido(id);
     void tocarBeepUrna();
   }
 
   async function confirmar() {
-    if (!escolha || enviando) return;
+    if (!escolha || enviando || !prontoParaInteragir) return;
     setErro(null);
     setEnviando(true);
 
@@ -60,6 +79,8 @@ function Cabine() {
         votar(escolha.id),
         new Promise((resolve) => setTimeout(resolve, 920)),
       ]);
+      setEnviando(false);
+      setEscolhido(null);
       router.replace("/resultados");
     } catch (err) {
       setErro(mensagemDeErro(err));
@@ -72,9 +93,11 @@ function Cabine() {
       <div className="flex flex-wrap items-end gap-3">
         <div>
           <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight">Cabine de votação</h1>
-          <p className="text-muted">
-            <Senha usuario={meuTicket} /> · {meuTicket.nome}
-          </p>
+          {eleitorCabine && (
+            <p className="text-muted">
+              <Senha usuario={eleitorCabine} /> · {eleitorCabine.nome}
+            </p>
+          )}
         </div>
         <Cronometro desde={estado?.naCabine?.chamadoEm ?? null} />
       </div>
