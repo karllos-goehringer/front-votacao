@@ -56,13 +56,46 @@ const CORES_CANDIDATO = [
   { texto: "text-candidato-b", fundo: "bg-candidato-b", suave: "bg-candidato-b-soft", borda: "border-candidato-b", anel: "ring-candidato-b/20" },
 ];
 
-export function corCandidato(id: number) {
+/** Voto nulo é neutro: nunca pode parecer com um candidato. */
+const CORES_NULO = { texto: "text-nulo", fundo: "bg-nulo", suave: "bg-nulo-soft", borda: "border-nulo", anel: "ring-nulo/20" };
+
+export function corCandidato(id: number, nulo = false) {
+  if (nulo) return CORES_NULO;
   return CORES_CANDIDATO[(id - 1) % CORES_CANDIDATO.length] ?? CORES_CANDIDATO[0];
 }
 
-/** Sem foto cadastrada: mostra a letra do candidato num círculo. */
-export function FotoCandidato({ id, nome, urlFoto, className = "size-20 text-4xl" }: { id: number; nome: string; urlFoto?: string | null; className?: string }) {
-  const cor = corCandidato(id);
+/** Símbolo de "anulado" (círculo cortado), no lugar da foto/letra. */
+function IconeNulo() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" className="size-[0.8em]">
+      <circle cx="12" cy="12" r="9" />
+      <path d="M5.6 18.4 18.4 5.6" />
+    </svg>
+  );
+}
+
+/** Sem foto cadastrada: mostra a letra do candidato num círculo. Voto nulo mostra o símbolo ⊘. */
+export function FotoCandidato({
+  id,
+  nome,
+  urlFoto,
+  nulo = false,
+  className = "size-20 text-4xl",
+}: {
+  id: number;
+  nome: string;
+  urlFoto?: string | null;
+  nulo?: boolean;
+  className?: string;
+}) {
+  const cor = corCandidato(id, nulo);
+  if (nulo) {
+    return (
+      <span aria-hidden className={`inline-flex items-center justify-center rounded-full ${cor.suave} ${cor.texto} ${className}`}>
+        <IconeNulo />
+      </span>
+    );
+  }
   if (urlFoto) {
     // eslint-disable-next-line @next/next/no-img-element
     return <img src={urlFoto} alt={nome} className={`rounded-full object-cover ${className}`} />;
@@ -83,15 +116,18 @@ export function BarrasResultado({
   destacarId?: number;
 }) {
   const total = resultado.reduce((s, c) => s + c.votos, 0);
+  // Nulos sempre por último, depois dos candidatos.
+  const ordenado = [...resultado].sort((a, b) => Number(a.partido === null) - Number(b.partido === null));
   return (
     <div className="space-y-4">
-      {resultado.map((c) => {
-        const cor = corCandidato(c.candidatoId);
+      {ordenado.map((c) => {
+        const nulo = c.partido === null;
+        const cor = corCandidato(c.candidatoId, nulo);
         const pct = total ? (c.votos / total) * 100 : 0;
         return (
           <div key={c.candidatoId}>
             <div className="flex items-center gap-3 mb-1.5">
-              <FotoCandidato id={c.candidatoId} nome={c.nome} className="size-9 text-base" />
+              <FotoCandidato id={c.candidatoId} nome={c.nome} nulo={nulo} className="size-9 text-base" />
               <div className="min-w-0">
                 <p className="font-medium truncate">
                   {c.nome}

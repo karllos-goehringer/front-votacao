@@ -50,6 +50,11 @@ export interface Candidato {
   urlFoto: string | null;
 }
 
+/** O voto nulo ("Anular") é o único candidato sem partido. */
+export function ehNulo(c: { partido: Partido | null }): boolean {
+  return c.partido === null;
+}
+
 /** Item do array de GET /resultados. */
 export interface ContagemCandidato {
   candidatoId: number;

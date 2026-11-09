@@ -6,7 +6,7 @@ import type { ReactNode } from "react";
 import { SoNoNavegador } from "@/components/SoNoNavegador";
 import { Aviso, Botao, Cartao, FotoCandidato, Senha, corCandidato } from "@/components/ui";
 import { useFila } from "@/lib/fila/FilaProvider";
-import { duracao, horario, type ContagemCandidato } from "@/lib/fila/tipos";
+import { duracao, ehNulo, horario, type ContagemCandidato } from "@/lib/fila/tipos";
 
 /**
  * Resultados parciais (GET /resultados). Pública: qualquer um pode ver.
@@ -59,8 +59,11 @@ function Resultados() {
       ) : (
         <>
           <div className="grid gap-4 sm:grid-cols-2">
-            {dados.map((c) => (
+            {dados.filter((c) => !ehNulo(c)).map((c) => (
               <CartaoCandidato key={c.candidatoId} candidato={c} total={total(dados)} seuVoto={c.candidatoId === votouEm} />
+            ))}
+            {dados.filter(ehNulo).map((c) => (
+              <CartaoNulo key={c.candidatoId} contagem={c} total={total(dados)} seuVoto={c.candidatoId === votouEm} />
             ))}
           </div>
           <Resumo dados={dados} atualizadoEm={resultadoEm} />
@@ -85,15 +88,11 @@ function CartaoCandidato({ candidato: c, total, seuVoto }: { candidato: Contagem
         <FotoCandidato id={c.candidatoId} nome={c.nome} urlFoto={c.urlFoto} className="size-16 text-3xl" />
         <div className="min-w-0">
           <h2 className="text-lg font-semibold truncate">{c.nome}</h2>
-          <p className="text-sm text-muted">
-            {c.partido ? (
-              <>
-                {c.partido.nome} · <span className="font-mono">{c.partido.digito}</span>
-              </>
-            ) : (
-              "Voto nulo"
-            )}
-          </p>
+          {c.partido && (
+            <p className="text-sm text-muted">
+              {c.partido.nome} · <span className="font-mono">{c.partido.digito}</span>
+            </p>
+          )}
           {seuVoto && (
             <span className={`inline-block mt-1 text-xs font-medium px-2 py-0.5 rounded-full ${cor.suave} ${cor.texto}`}>
               seu voto
@@ -121,13 +120,49 @@ function CartaoCandidato({ candidato: c, total, seuVoto }: { candidato: Contagem
   );
 }
 
+/** Voto nulo: faixa neutra de largura total, abaixo dos candidatos. */
+function CartaoNulo({ contagem: c, total, seuVoto }: { contagem: ContagemCandidato; total: number; seuVoto: boolean }) {
+  const pct = total ? (c.votos / total) * 100 : 0;
+  return (
+    <section
+      className={`sm:col-span-2 rounded-2xl border-2 p-4 ${
+        seuVoto ? "border-nulo bg-nulo-soft ring-4 ring-nulo/20" : "border-dashed border-border bg-card"
+      }`}
+    >
+      <div className="flex items-center gap-3">
+        <FotoCandidato id={c.candidatoId} nome={c.nome} nulo className="size-10 text-2xl shrink-0" />
+        <h2 className="font-semibold">Votos nulos</h2>
+        {seuVoto && (
+          <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-card text-nulo border border-border">seu voto</span>
+        )}
+        <p className="ml-auto flex items-baseline gap-2">
+          <span className="text-2xl font-bold tabular-nums text-nulo">{c.votos}</span>
+          <span className="text-sm text-muted tabular-nums">{pct.toFixed(0)}%</span>
+        </p>
+      </div>
+      <div
+        className="mt-3 h-2 rounded-full bg-background overflow-hidden"
+        role="meter"
+        aria-label="Votos nulos"
+        aria-valuenow={Math.round(pct)}
+        aria-valuemin={0}
+        aria-valuemax={100}
+      >
+        <div className="h-full rounded-full bg-nulo transition-[width] duration-500" style={{ width: `${pct}%` }} />
+      </div>
+    </section>
+  );
+}
+
 function Resumo({ dados, atualizadoEm }: { dados: ContagemCandidato[]; atualizadoEm: string | null }) {
   const soma = total(dados);
-  const ordenados = [...dados].sort((a, b) => b.votos - a.votos);
+  // Nulo não "lidera": a disputa é só entre candidatos.
+  const ordenados = dados.filter((c) => !ehNulo(c)).sort((a, b) => b.votos - a.votos);
   const [primeiro, segundo] = ordenados;
 
   let texto: string;
   if (soma === 0) texto = "Ninguém votou ainda.";
+  else if (!primeiro || primeiro.votos === 0) texto = "Nenhum voto válido ainda.";
   else if (!segundo || primeiro.votos !== segundo.votos)
     texto = `Quem está na frente: ${primeiro.nome}${segundo ? ` (+${primeiro.votos - segundo.votos})` : ""}`;
   else texto = "Empate.";
@@ -145,6 +180,7 @@ function Comprovante() {
   const router = useRouter();
   if (!comprovante) return null;
   const { voto } = comprovante;
+  const nulo = comprovante.resultado.some((c) => c.candidatoId === voto.candidatoId && ehNulo(c));
 
   function sair() {
     concluir();
@@ -156,10 +192,10 @@ function Comprovante() {
       <h2 className="font-semibold mb-4">Seu comprovante</h2>
       <div className="grid gap-6 sm:grid-cols-[14rem_1fr] items-start">
         <div className="flex items-center gap-3">
-          <FotoCandidato id={voto.candidatoId} nome={voto.candidatoNome ?? ""} className="size-12 text-xl" />
+          <FotoCandidato id={voto.candidatoId} nome={voto.candidatoNome ?? ""} nulo={nulo} className="size-12 text-xl" />
           <div className="min-w-0">
-            <p className="text-xs text-muted">Você votou em</p>
-            <p className="font-semibold truncate">{voto.candidatoNome}</p>
+            <p className="text-xs text-muted">{nulo ? "Você" : "Você votou em"}</p>
+            <p className="font-semibold truncate">{nulo ? "Votou nulo" : voto.candidatoNome}</p>
           </div>
         </div>
         <dl className="divide-y divide-border text-sm">

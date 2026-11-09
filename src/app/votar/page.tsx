@@ -7,7 +7,7 @@ import { Aviso, Botao, Cartao, FotoCandidato, Senha, corCandidato, mensagemDeErr
 import { api } from "@/lib/api";
 import { useFila } from "@/lib/fila/FilaProvider";
 import { useIrParaDestino } from "@/lib/fila/destino";
-import { duracao, type Candidato } from "@/lib/fila/tipos";
+import { duracao, ehNulo, type Candidato } from "@/lib/fila/tipos";
 
 export default function VotarPage() {
   return (
@@ -42,7 +42,7 @@ function Cabine() {
 
   async function confirmar() {
     if (!escolha) return;
-    if (!confirm(`Confirmar voto em ${escolha.nome}?`)) return;
+    if (!confirm(ehNulo(escolha) ? "Confirmar voto nulo?" : `Confirmar voto em ${escolha.nome}?`)) return;
     setErro(null);
     setEnviando(true);
     try {
@@ -71,7 +71,7 @@ function Cabine() {
       {!candidatos && !erro && <p className="text-muted">Carregando candidatos…</p>}
 
       <div className="grid gap-4 sm:grid-cols-2" role="radiogroup" aria-label="Candidatos">
-        {candidatos?.map((c) => {
+        {candidatos?.filter((c) => !ehNulo(c)).map((c) => {
           const cor = corCandidato(c.id);
           const marcado = escolhido === c.id;
           return (
@@ -88,8 +88,32 @@ function Cabine() {
             >
               <FotoCandidato id={c.id} nome={c.nome} urlFoto={c.urlFoto} className="size-28 text-6xl mx-auto" />
               <p className="mt-4 text-xl font-semibold">{c.nome}</p>
-              <p className="text-sm text-muted">{c.partido?.nome ?? "Voto nulo"}</p>
-              <p className={`mt-2 font-mono text-3xl font-bold tabular-nums ${cor.texto}`}>{c.partido?.digito ?? "—"}</p>
+              <p className="text-sm text-muted">{c.partido?.nome}</p>
+              <p className={`mt-2 font-mono text-3xl font-bold tabular-nums ${cor.texto}`}>{c.partido?.digito}</p>
+            </button>
+          );
+        })}
+
+        {/* Voto nulo: opção à parte, neutra e menos chamativa que os candidatos. */}
+        {candidatos?.filter(ehNulo).map((c) => {
+          const marcado = escolhido === c.id;
+          return (
+            <button
+              key={c.id}
+              type="button"
+              role="radio"
+              aria-checked={marcado}
+              onClick={() => setEscolhido(c.id)}
+              disabled={enviando}
+              className={`sm:col-span-2 flex items-center gap-4 rounded-2xl border-2 px-5 py-4 text-left transition ${
+                marcado ? "border-nulo bg-nulo-soft ring-4 ring-nulo/20" : "border-dashed border-border bg-card hover:border-muted"
+              }`}
+            >
+              <FotoCandidato id={c.id} nome={c.nome} nulo className="size-12 text-3xl shrink-0" />
+              <span className="min-w-0">
+                <span className="block font-semibold">Votar nulo</span>
+                <span className="block text-sm text-muted">Anula o seu voto: ele não conta para nenhum candidato.</span>
+              </span>
             </button>
           );
         })}
@@ -101,7 +125,7 @@ function Cabine() {
         <p className="text-sm text-muted">
           {escolha ? (
             <>
-              Seu voto: <strong className="text-foreground">{escolha.nome}</strong>
+              Seu voto: <strong className="text-foreground">{ehNulo(escolha) ? "Nulo" : escolha.nome}</strong>
             </>
           ) : (
             "Nenhum candidato selecionado"
