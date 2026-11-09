@@ -9,11 +9,11 @@ import { useFila } from "@/lib/fila/FilaProvider";
 import { useIrParaDestino } from "@/lib/fila/destino";
 
 export default function Home() {
-  const { jaVotou, dispositivoVerificado } = useFila();
+  const { jaVotou, comprovante } = useFila();
   const router = useRouter();
   const montado = useMontado();
 
-  const jaVotouConfirmado = montado && jaVotou && dispositivoVerificado;
+  const jaVotouConfirmado = montado && (Boolean(comprovante) || jaVotou);
 
   useEffect(() => {
     if (jaVotouConfirmado) {
@@ -21,14 +21,9 @@ export default function Home() {
     }
   }, [jaVotouConfirmado, router]);
 
-  // Se já votou (confirmado pelo backend), não exibe a tela de início e redireciona
+  // Se já votou (comprovante ativo ou confirmado pelo backend), não exibe a tela de início e redireciona
   if (jaVotouConfirmado) {
     return <p className="text-muted text-center py-20">Redirecionando para os resultados…</p>;
-  }
-
-  // Enquanto valida o status com o endpoint (evita falso-positivo após reset do banco)
-  if (montado && jaVotou && !dispositivoVerificado) {
-    return <p className="text-muted text-center py-20">Verificando situação do eleitor…</p>;
   }
   return (
     <div className="max-w-xl mx-auto py-6 sm:py-12 space-y-8 text-center">

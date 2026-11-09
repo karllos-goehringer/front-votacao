@@ -13,6 +13,7 @@ import {
   lerComprovante,
   lerJaVotou,
   lerTicket,
+  obterOuCriarDeviceToken,
 } from "./sessao";
 import { normalizarContagem } from "./tipos";
 import type {
@@ -70,10 +71,7 @@ export function FilaProvider({ children }: { children: ReactNode }) {
   const [meuTicket, setMeuTicket] = useState<Ticket | null>(() => (noNavegador ? lerTicket() : null));
   const [comprovante, setComprovante] = useState<Comprovante | null>(() => (noNavegador ? lerComprovante() : null));
   const [jaVotou, setJaVotou] = useState<boolean>(() => (noNavegador ? lerJaVotou() || Boolean(lerComprovante()) : false));
-  const [dispositivoVerificado, setDispositivoVerificado] = useState<boolean>(() => {
-    if (!noNavegador) return false;
-    return !lerJaVotou() && !lerComprovante();
-  });
+  const [dispositivoVerificado, setDispositivoVerificado] = useState<boolean>(true);
   const [resultado, setResultadoBruto] = useState<ContagemCandidato[] | null>(null);
   const [resultadoEm, setResultadoEm] = useState<string | null>(null);
   const [erroResultado, setErroResultado] = useState<string | null>(null);
@@ -102,12 +100,14 @@ export function FilaProvider({ children }: { children: ReactNode }) {
             setJaVotou(true);
             gravarJaVotou(true);
           } else {
-            // Se o backend autoritativo confirma que este dispositivo NÃO votou no banco atual
-            // (ex: banco resetado, nova eleição ou este dispositivo ainda não votou):
-            setJaVotou(false);
-            gravarJaVotou(false);
-            setComprovante(null);
-            gravarComprovante(null);
+            // Se o backend informa que o dispositivo não votou no banco:
+            // Só desmarca jaVotou se este eleitor NÃO possui um comprovante válido na sessão ativa.
+            // O comprovante recebido após votar NUNCA deve ser apagado pela sincronização em segundo plano!
+            const temComprovante = Boolean(lerComprovante());
+            if (!temComprovante) {
+              setJaVotou(false);
+              gravarJaVotou(false);
+            }
           }
         }
       } catch {
@@ -225,7 +225,13 @@ export function FilaProvider({ children }: { children: ReactNode }) {
 
   const entrar = useCallback(
     async (nome: string, tipoFila: TipoFila) => {
-      const usuario = await pedir<Usuario & { chave: string }>("fila:entrar", { nome, tipoFila });
+      const devToken = obterOuCriarDeviceToken();
+      const usuario = await pedir<Usuario & { chave: string }>("fila:entrar", {
+        nome,
+        tipoFila,
+        dispositivoToken: devToken,
+        tokenDispositivo: devToken,
+      });
       const ticket: Ticket = { ...usuario, emitidoEm: new Date().toISOString() };
       definirComprovante(null);
       definirTicket(ticket);
@@ -244,9 +250,16 @@ export function FilaProvider({ children }: { children: ReactNode }) {
   const votar = useCallback(
     async (candidatoId: number) => {
       if (!meuTicket) throw new Error("Você não está na fila");
+      const devToken = obterOuCriarDeviceToken();
       const r = await api<ResultadoVoto>("/votos", {
         method: "POST",
-        body: { usuarioId: meuTicket.id, chave: meuTicket.chave, candidatoId },
+        body: {
+          usuarioId: meuTicket.id,
+          chave: meuTicket.chave,
+          candidatoId,
+          dispositivoToken: devToken,
+          tokenDispositivo: devToken,
+        },
       });
       const novo: Comprovante = {
         ...r.data,
@@ -257,6 +270,7 @@ export function FilaProvider({ children }: { children: ReactNode }) {
       setResultado(novo.resultado);
       gravarJaVotou(true);
       setJaVotou(true);
+      setDispositivoVerificado(true);
       // Limpa a senha do eleitor, pois o ciclo do ticket terminou com o voto computado
       definirTicket(null);
       return novo;
@@ -269,6 +283,7 @@ export function FilaProvider({ children }: { children: ReactNode }) {
     definirTicket(null);
     gravarJaVotou(true);
     setJaVotou(true);
+    setDispositivoVerificado(true);
   }, [definirComprovante, definirTicket]);
 
   const situacao = useMemo(

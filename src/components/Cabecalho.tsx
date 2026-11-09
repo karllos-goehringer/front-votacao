@@ -15,10 +15,10 @@ const LINKS = [
 
 export function Cabecalho() {
   const pathname = usePathname();
-  const { jaVotou, dispositivoVerificado } = useFila();
+  const { jaVotou, comprovante } = useFila();
   const montado = useMontado();
 
-  const jaVotouEfetivo = montado && jaVotou && dispositivoVerificado;
+  const jaVotouEfetivo = montado && (Boolean(comprovante) || jaVotou);
   const links = jaVotouEfetivo ? LINKS.filter((l) => l.href !== "/") : LINKS;
 
   return (
@@ -63,10 +63,10 @@ export function Cabecalho() {
 
 function NavBottom() {
   const pathname = usePathname();
-  const { jaVotou, dispositivoVerificado } = useFila();
+  const { jaVotou, comprovante } = useFila();
   const montado = useMontado();
 
-  const jaVotouEfetivo = montado && jaVotou && dispositivoVerificado;
+  const jaVotouEfetivo = montado && (Boolean(comprovante) || jaVotou);
 
   return (
     <nav

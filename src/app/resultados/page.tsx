@@ -255,8 +255,8 @@ function Comprovante({ candidatos }: { candidatos?: Candidato[] | null }) {
 }
 
 function AcoesVisitante() {
-  const { meuTicket, jaVotou } = useFila();
-  if (jaVotou) {
+  const { meuTicket, jaVotou, comprovante } = useFila();
+  if (jaVotou || Boolean(comprovante)) {
     return (
       <div className="rounded-xl border border-border/80 bg-card p-4 text-center sm:text-left flex flex-col sm:flex-row items-center justify-between gap-3">
         <p className="text-sm text-muted">

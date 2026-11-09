@@ -1,3 +1,5 @@
+import { obterOuCriarDeviceToken } from "./fila/sessao";
+
 /** URL da API REST do back: NEXT_PUBLIC_API_URL, ou o mesmo host da página na porta 3001. */
 export function urlDaApi(): string {
   if (process.env.NEXT_PUBLIC_API_URL) return process.env.NEXT_PUBLIC_API_URL.replace(/\/$/, "");
@@ -30,12 +32,19 @@ export async function api<T>(
   if (body !== undefined) headers["Content-Type"] = "application/json";
   if (token) headers.Authorization = `Bearer ${token}`;
 
+  const devToken = obterOuCriarDeviceToken();
+  if (devToken) {
+    headers["x-device-token"] = devToken;
+    headers["x-device-id"] = devToken;
+  }
+
   const inicio = performance.now();
   let res: Response;
   try {
     res = await fetch(`${urlDaApi()}${caminho}`, {
       method,
       headers,
+      cache: "no-store",
       body: body === undefined ? undefined : JSON.stringify(body),
     });
   } catch {

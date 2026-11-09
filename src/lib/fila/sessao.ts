@@ -8,6 +8,24 @@ export const CHAVE_TICKET = "fila:ticket:v2";
 export const CHAVE_COMPROVANTE = "fila:voto:v1";
 export const CHAVE_ADMIN = "fila:admin:v1";
 export const CHAVE_JA_VOTOU = "fila:jaVotou:v1";
+export const CHAVE_DEVICE_TOKEN = "fila:dispositivo:token:v1";
+
+export function obterOuCriarDeviceToken(): string {
+  if (typeof window === "undefined") return "";
+  try {
+    let token = localStorage.getItem(CHAVE_DEVICE_TOKEN);
+    if (!token) {
+      token =
+        typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+          ? crypto.randomUUID()
+          : `dev-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+      localStorage.setItem(CHAVE_DEVICE_TOKEN, token);
+    }
+    return token;
+  } catch {
+    return "";
+  }
+}
 
 export interface SessaoAdmin {
   token: string;
@@ -57,8 +75,7 @@ function ehComprovante(v: unknown): v is Comprovante {
     ehObjeto(v) &&
     ehObjeto(v.voto) &&
     typeof v.voto.candidatoId === "number" &&
-    Array.isArray(v.resultado) &&
-    typeof v.tempoRequisicaoMs === "number"
+    Array.isArray(v.resultado)
   );
 }
 
