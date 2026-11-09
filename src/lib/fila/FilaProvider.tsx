@@ -5,12 +5,13 @@ import { api } from "@/lib/api";
 import { FilaSocket, urlDoServidor } from "./FilaSocket";
 import {
   CHAVE_COMPROVANTE,
+  CHAVE_JA_VOTOU,
   CHAVE_TICKET,
   gravarComprovante,
-  gravarEstado,
+  gravarJaVotou,
   gravarTicket,
   lerComprovante,
-  lerEstado,
+  lerJaVotou,
   lerTicket,
 } from "./sessao";
 import { normalizarContagem } from "./tipos";
@@ -39,6 +40,8 @@ interface FilaContexto {
   sincronizado: boolean;
   meuTicket: Ticket | null;
   situacao: SituacaoTicket | null;
+  /** Indica se este navegador já concluiu seu voto nesta eleição. */
+  jaVotou: boolean;
   /** Comprovante do voto deste navegador (existe entre votar e clicar em Concluir). */
   comprovante: Comprovante | null;
   /** Quantidade absoluta de votos de cada candidato (GET /resultados), atualizada ao vivo. */
@@ -59,12 +62,12 @@ const Contexto = createContext<FilaContexto | null>(null);
 const noNavegador = typeof window !== "undefined";
 
 export function FilaProvider({ children }: { children: ReactNode }) {
-  // O estado inicial vem do localStorage: o F5 já abre com a última fila
-  // conhecida, a senha do eleitor e o comprovante do voto. No servidor é null;
-  // quem lê esses dados fica dentro de <SoNoNavegador>, sem erro de hidratação.
-  const [estado, setEstado] = useState<FilaEstado | null>(() => (noNavegador ? lerEstado() : null));
+  // O estado da fila vem em tempo real do servidor (REST + WebSocket).
+  // Apenas a senha do eleitor e o comprovante ficam no localStorage para o F5 não perder o voto/lugar.
+  const [estado, setEstado] = useState<FilaEstado | null>(null);
   const [meuTicket, setMeuTicket] = useState<Ticket | null>(() => (noNavegador ? lerTicket() : null));
   const [comprovante, setComprovante] = useState<Comprovante | null>(() => (noNavegador ? lerComprovante() : null));
+  const [jaVotou, setJaVotou] = useState<boolean>(() => (noNavegador ? lerJaVotou() || Boolean(lerComprovante()) : false));
   const [resultado, setResultadoBruto] = useState<ContagemCandidato[] | null>(null);
   const [resultadoEm, setResultadoEm] = useState<string | null>(null);
   const [erroResultado, setErroResultado] = useState<string | null>(null);
@@ -81,28 +84,85 @@ export function FilaProvider({ children }: { children: ReactNode }) {
     const socket = new FilaSocket(urlDoServidor());
     socketRef.current = socket;
 
+    // Sincroniza o status do dispositivo com a verdade autoritativa do banco de dados (GET /dispositivo/status)
+    const sincronizarStatusDispositivo = async () => {
+      try {
+        const r = await api<{ jaVotou: boolean }>("/dispositivo/status");
+        if (r.data && typeof r.data.jaVotou === "boolean") {
+          if (r.data.jaVotou) {
+            // Se o backend confirma que este dispositivo físico/IP já votou no banco oficial,
+            // marca jaVotou como true (impede votação duplicada mesmo sem comprovante em abas anônimas)
+            setJaVotou(true);
+            gravarJaVotou(true);
+          }
+        }
+      } catch {
+        // Se a rota falhar ou backend indisponível, mantém o estado atual
+      }
+    };
+
     const atualizarResultado = () =>
-      api<ContagemCandidato[]>("/resultados")
-        .then((r) => setResultado(r.data))
+      api<unknown[]>("/resultados")
+        .then((r) => {
+          const normalizado = normalizarContagem(r.data);
+          setResultado(normalizado);
+          const totalVotos = normalizado.reduce((acc, c) => acc + (c.votos || 0), 0);
+          if (totalVotos === 0) {
+            // Se o total de votos no banco for 0 (ex: após db:reset ou reiniciar fila),
+            // limpa o voto, comprovante e senha deste eleitor para liberar nova votação e reexibir o início
+            setJaVotou(false);
+            setComprovante(null);
+            setMeuTicket(null);
+            gravarJaVotou(false);
+            gravarComprovante(null);
+            gravarTicket(null);
+          }
+        })
         .catch((err: unknown) => setErroResultado(err instanceof Error ? err.message : "Falha ao buscar resultados"));
+
+    // Busca o estado inicial atualizado diretamente da API e valida o dispositivo
+    api<FilaEstado>("/fila")
+      .then((r) => {
+        setEstado(r.data);
+        setSincronizado(true);
+      })
+      .catch(() => undefined);
+
+    void sincronizarStatusDispositivo();
+    void atualizarResultado();
 
     const pararEstado = socket.onEstado((novo) => {
       setEstado(novo);
       setSincronizado(true);
-      gravarEstado(novo);
+      // Se a cabine e filas estiverem vazias (ex: reset ou restart de fila), revalida com o banco
+      if (!novo.naCabine && novo.preferencial.length === 0 && novo.comum.length === 0) {
+        void sincronizarStatusDispositivo();
+        void atualizarResultado();
+      }
     });
+
     const pararStatus = socket.onStatus((novo) => {
       setStatus(novo);
-      if (novo !== "conectado") setSincronizado(false);
-      else void atualizarResultado();
+      if (novo !== "conectado") {
+        setSincronizado(false);
+      } else {
+        // Ao restabelecer conexão (ex: após restart do servidor/BD), atualiza dados imediatamente
+        void atualizarResultado();
+        void sincronizarStatusDispositivo();
+      }
     });
-    const pararVoto = socket.onVoto(() => void atualizarResultado());
+
+    const pararVoto = socket.onVoto(() => {
+      void atualizarResultado();
+      void sincronizarStatusDispositivo();
+    });
     socket.conectar();
 
-    // Mantém senha e comprovante iguais entre abas abertas.
+    // Mantém senha, comprovante e estado de votação iguais entre abas abertas.
     const aoMudarStorage = (ev: StorageEvent) => {
       if (ev.key === CHAVE_TICKET) setMeuTicket(lerTicket());
       if (ev.key === CHAVE_COMPROVANTE) setComprovante(lerComprovante());
+      if (ev.key === CHAVE_JA_VOTOU) setJaVotou(lerJaVotou());
     };
     window.addEventListener("storage", aoMudarStorage);
 
@@ -157,22 +217,32 @@ export function FilaProvider({ children }: { children: ReactNode }) {
         method: "POST",
         body: { usuarioId: meuTicket.id, chave: meuTicket.chave, candidatoId },
       });
-      const novo: Comprovante = { ...r.data, tempoRequisicaoMs: r.tempoMs };
+      const novo: Comprovante = {
+        ...r.data,
+        resultado: normalizarContagem(r.data.resultado),
+        tempoRequisicaoMs: r.tempoMs,
+      };
       definirComprovante(novo);
-      setResultado(r.data.resultado);
+      setResultado(novo.resultado);
+      gravarJaVotou(true);
+      setJaVotou(true);
+      // Limpa a senha do eleitor, pois o ciclo do ticket terminou com o voto computado
+      definirTicket(null);
       return novo;
     },
-    [meuTicket, definirComprovante, setResultado],
+    [meuTicket, definirComprovante, definirTicket, setResultado],
   );
 
   const concluir = useCallback(() => {
     definirComprovante(null);
     definirTicket(null);
+    gravarJaVotou(true);
+    setJaVotou(true);
   }, [definirComprovante, definirTicket]);
 
   const situacao = useMemo(
-    () => (meuTicket ? calcularSituacao(estado, meuTicket, comprovante, sincronizado) : null),
-    [estado, meuTicket, comprovante, sincronizado],
+    () => (meuTicket ? calcularSituacao(estado, meuTicket, comprovante, sincronizado, jaVotou) : null),
+    [estado, meuTicket, comprovante, sincronizado, jaVotou],
   );
 
   const valor = useMemo<FilaContexto>(
@@ -182,6 +252,7 @@ export function FilaProvider({ children }: { children: ReactNode }) {
       sincronizado,
       meuTicket,
       situacao,
+      jaVotou,
       comprovante,
       resultado,
       resultadoEm,
@@ -191,7 +262,7 @@ export function FilaProvider({ children }: { children: ReactNode }) {
       votar,
       concluir,
     }),
-    [estado, status, sincronizado, meuTicket, situacao, comprovante, resultado, resultadoEm, erroResultado, entrar, sairDaFila, votar, concluir],
+    [estado, status, sincronizado, meuTicket, situacao, jaVotou, comprovante, resultado, resultadoEm, erroResultado, entrar, sairDaFila, votar, concluir],
   );
 
   return <Contexto value={valor}>{children}</Contexto>;
@@ -209,8 +280,9 @@ function calcularSituacao(
   ticket: Ticket,
   comprovante: Comprovante | null,
   sincronizado: boolean,
+  jaVotou: boolean,
 ): SituacaoTicket {
-  if (comprovante) return { tipo: "votou" };
+  if (comprovante || jaVotou) return { tipo: "votou" };
   if (!estado) return { tipo: "desconhecida" };
   if (estado.naCabine?.id === ticket.id) return { tipo: "na-cabine" };
 

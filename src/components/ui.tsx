@@ -1,4 +1,6 @@
-import type { ReactNode } from "react";
+"use client";
+
+import { useState, type ReactNode } from "react";
 import { ROTULO_FILA, senha, type TipoFila, type Usuario } from "@/lib/fila/tipos";
 
 export function Cartao({ children, className = "" }: { children: ReactNode; className?: string }) {
@@ -60,8 +62,10 @@ const CORES_CANDIDATO = [
 const CORES_NULO = { texto: "text-nulo", fundo: "bg-nulo", suave: "bg-nulo-soft", borda: "border-nulo", anel: "ring-nulo/20" };
 
 export function corCandidato(id: number, nulo = false) {
-  if (nulo) return CORES_NULO;
-  return CORES_CANDIDATO[(id - 1) % CORES_CANDIDATO.length] ?? CORES_CANDIDATO[0];
+  if (nulo || id === 1) return CORES_NULO;
+  // Candidato A (id 2) -> index 0 (Azul), Candidato B (id 3) -> index 1 (Vermelho)
+  const index = id >= 2 ? id - 2 : Math.max(0, id - 1);
+  return CORES_CANDIDATO[index % CORES_CANDIDATO.length] ?? CORES_CANDIDATO[0];
 }
 
 /** Símbolo de "anulado" (círculo cortado), no lugar da foto/letra. */
@@ -88,20 +92,37 @@ export function FotoCandidato({
   nulo?: boolean;
   className?: string;
 }) {
+  const [erroUrl, setErroUrl] = useState<string | null>(null);
+
   const cor = corCandidato(id, nulo);
-  if (nulo) {
+  const ehVotoNulo =
+    nulo ||
+    id === 1 ||
+    nome.toLowerCase().includes("nulo") ||
+    nome.toLowerCase().includes("anular");
+
+  if (ehVotoNulo) {
     return (
-      <span aria-hidden className={`inline-flex items-center justify-center rounded-full ${cor.suave} ${cor.texto} ${className}`}>
+      <span aria-hidden className={`inline-flex items-center justify-center rounded-full shrink-0 aspect-square ${cor.suave} ${cor.texto} ${className}`}>
         <IconeNulo />
       </span>
     );
   }
-  if (urlFoto) {
-    // eslint-disable-next-line @next/next/no-img-element
-    return <img src={urlFoto} alt={nome} className={`rounded-full object-cover ${className}`} />;
+  if (urlFoto && erroUrl !== urlFoto) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        key={urlFoto}
+        src={urlFoto}
+        alt={nome}
+        referrerPolicy="no-referrer"
+        onError={() => setErroUrl(urlFoto)}
+        className={`rounded-full object-cover shrink-0 aspect-square ${className}`}
+      />
+    );
   }
   return (
-    <span aria-hidden className={`inline-flex items-center justify-center rounded-full font-bold ${cor.suave} ${cor.texto} ${className}`}>
+    <span aria-hidden className={`inline-flex items-center justify-center rounded-full font-bold shrink-0 aspect-square ${cor.suave} ${cor.texto} ${className}`}>
       {letraCandidato(nome)}
     </span>
   );
@@ -112,7 +133,13 @@ export function BarrasResultado({
   resultado,
   destacarId,
 }: {
-  resultado: { candidatoId: number; nome: string; partido: { nome: string; digito: string } | null; votos: number }[];
+  resultado: {
+    candidatoId: number;
+    nome: string;
+    partido: { nome: string; digito: string } | null;
+    urlFoto?: string | null;
+    votos: number;
+  }[];
   destacarId?: number;
 }) {
   const total = resultado.reduce((s, c) => s + c.votos, 0);
@@ -127,7 +154,13 @@ export function BarrasResultado({
         return (
           <div key={c.candidatoId}>
             <div className="flex items-center gap-3 mb-1.5">
-              <FotoCandidato id={c.candidatoId} nome={c.nome} nulo={nulo} className="size-9 text-base" />
+              <FotoCandidato
+                id={c.candidatoId}
+                nome={c.nome}
+                urlFoto={c.urlFoto}
+                nulo={nulo}
+                className="size-9 text-base"
+              />
               <div className="min-w-0">
                 <p className="font-medium truncate">
                   {c.nome}
@@ -152,3 +185,6 @@ export function BarrasResultado({
     </div>
   );
 }
+
+export { BotaoConfirmaUrna } from "./BotaoConfirmaUrna";
+

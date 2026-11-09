@@ -75,7 +75,7 @@ export function normalizarContagem(lista: unknown): ContagemCandidato[] {
     candidatoId: Number(item.candidatoId ?? item.idCandidato ?? item.id),
     nome: String(item.nome ?? ""),
     partido: (item.partido as Partido | null) ?? null,
-    urlFoto: (item.urlFoto as string | null) ?? null,
+    urlFoto: (item.urlFoto as string | null) ?? (item.url_foto as string | null) ?? null,
     votos: Number(item.votos ?? item.qtdVotosTotal ?? item.votosTotais ?? 0),
   }));
 }

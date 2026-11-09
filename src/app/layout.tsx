@@ -38,7 +38,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <FilaProvider>
           <AdminProvider>
             <Cabecalho />
-            <main className="flex-1 w-full max-w-6xl mx-auto px-4 py-6 sm:py-10">{children}</main>
+            <main className="flex-1 w-full max-w-6xl mx-auto px-4 pt-6 sm:pt-10 pb-28 sm:pb-10">{children}</main>
           </AdminProvider>
         </FilaProvider>
       </body>

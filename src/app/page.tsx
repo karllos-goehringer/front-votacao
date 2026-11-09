@@ -1,12 +1,27 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useEffect } from "react";
 import { SoNoNavegador } from "@/components/SoNoNavegador";
 import { useAdmin } from "@/lib/admin/AdminProvider";
 import { useFila } from "@/lib/fila/FilaProvider";
 import { useIrParaDestino } from "@/lib/fila/destino";
 
 export default function Home() {
+  const { jaVotou } = useFila();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (jaVotou) {
+      router.replace("/resultados");
+    }
+  }, [jaVotou, router]);
+
+  // Se já votou, não exibe a tela de início e redireciona para os resultados
+  if (jaVotou) {
+    return <p className="text-muted text-center py-20">Redirecionando para os resultados…</p>;
+  }
   return (
     <div className="max-w-xl mx-auto py-6 sm:py-12 space-y-8 text-center">
       <div>

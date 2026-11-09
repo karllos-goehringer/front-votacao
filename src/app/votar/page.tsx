@@ -3,11 +3,12 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { SoNoNavegador } from "@/components/SoNoNavegador";
-import { Aviso, Botao, Cartao, FotoCandidato, Senha, corCandidato, mensagemDeErro } from "@/components/ui";
+import { Aviso, BotaoConfirmaUrna, FotoCandidato, Senha, corCandidato, mensagemDeErro } from "@/components/ui";
 import { api } from "@/lib/api";
 import { useFila } from "@/lib/fila/FilaProvider";
 import { useIrParaDestino } from "@/lib/fila/destino";
 import { duracao, ehNulo, type Candidato } from "@/lib/fila/tipos";
+import { tocarSomUrna } from "@/lib/urnaAudio";
 
 export default function VotarPage() {
   return (
@@ -26,7 +27,7 @@ function Cabine() {
   const [erro, setErro] = useState<string | null>(null);
 
   // Só fica aqui quem está na cabine; depois do voto vai para os resultados parciais.
-  useIrParaDestino("/votar");
+  useIrParaDestino("/votar", ["/votar", "/resultados"]);
 
   useEffect(() => {
     api<Candidato[]>("/candidatos")
@@ -41,12 +42,19 @@ function Cabine() {
   const escolha = candidatos?.find((c) => c.id === escolhido);
 
   async function confirmar() {
-    if (!escolha) return;
-    if (!confirm(ehNulo(escolha) ? "Confirmar voto nulo?" : `Confirmar voto em ${escolha.nome}?`)) return;
+    if (!escolha || enviando) return;
     setErro(null);
     setEnviando(true);
+
+    // Reproduz o som característico da urna imediatamente no clique (gesto do usuário)
+    void tocarSomUrna();
+
     try {
-      await votar(escolha.id);
+      // Computa o voto no backend e aguarda a reprodução do som para a experiência completa
+      await Promise.all([
+        votar(escolha.id),
+        new Promise((resolve) => setTimeout(resolve, 920)),
+      ]);
       router.replace("/resultados");
     } catch (err) {
       setErro(mensagemDeErro(err));
@@ -121,20 +129,51 @@ function Cabine() {
 
       {erro && <Aviso>{erro}</Aviso>}
 
-      <Cartao className="flex flex-wrap items-center gap-4">
-        <p className="text-sm text-muted">
-          {escolha ? (
-            <>
-              Seu voto: <strong className="text-foreground">{ehNulo(escolha) ? "Nulo" : escolha.nome}</strong>
-            </>
-          ) : (
-            "Nenhum candidato selecionado"
-          )}
-        </p>
-        <Botao className="ml-auto px-8 py-3 text-base" disabled={!escolha || enviando} onClick={confirmar}>
-          {enviando ? "Registrando voto…" : "Votar"}
-        </Botao>
-      </Cartao>
+      <div className="rounded-2xl border-2 border-border bg-card p-5 sm:p-6 shadow-md transition-all">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-5">
+          <div className="flex items-center gap-4 min-w-0">
+            {escolha ? (
+              <div className="flex items-center gap-3.5 min-w-0">
+                <FotoCandidato
+                  id={escolha.id}
+                  nome={escolha.nome}
+                  urlFoto={escolha.urlFoto}
+                  nulo={ehNulo(escolha)}
+                  className="size-14 text-2xl shrink-0 aspect-square"
+                />
+                <div className="min-w-0">
+                  <p className="text-xs uppercase font-bold tracking-wider text-muted">Voto Selecionado</p>
+                  <p className="text-lg sm:text-xl font-bold truncate text-foreground">
+                    {ehNulo(escolha) ? "Voto Nulo" : escolha.nome}
+                  </p>
+                  {!ehNulo(escolha) && escolha.partido && (
+                    <p className="text-xs text-muted">
+                      {escolha.partido.nome} · Número{" "}
+                      <strong className="font-mono text-foreground font-bold">{escolha.partido.digito}</strong>
+                    </p>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center gap-3.5 text-muted">
+                <div className="size-14 rounded-full border-2 border-dashed border-border flex items-center justify-center shrink-0 text-xl font-bold text-muted/60">
+                  ?
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-foreground">Nenhum candidato selecionado</p>
+                  <p className="text-xs text-muted">Toque em um candidato acima para liberar a tecla CONFIRMA</p>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <BotaoConfirmaUrna
+            disabled={!escolha || enviando}
+            carregando={enviando}
+            onClick={confirmar}
+          />
+        </div>
+      </div>
     </div>
   );
 }

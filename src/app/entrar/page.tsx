@@ -17,9 +17,15 @@ export default function EntrarPage() {
 }
 
 function Conteudo() {
-  const { meuTicket } = useFila();
+  const { meuTicket, jaVotou } = useFila();
   // Chegou a vez (o servidor avisou pelo WebSocket) → vai para a tela de voto.
+  // Se já votou, o destino é /resultados.
   useIrParaDestino("/entrar", ["/entrar", null]);
+
+  if (jaVotou) {
+    return <p className="text-muted text-center py-20">Você já votou nesta eleição. Redirecionando para os resultados…</p>;
+  }
+
   return meuTicket ? <MinhaSenha /> : <FormularioSenha />;
 }
 

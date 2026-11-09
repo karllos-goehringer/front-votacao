@@ -1,12 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { SoNoNavegador } from "@/components/SoNoNavegador";
-import { Aviso, Botao, Cartao, FotoCandidato, Senha, corCandidato } from "@/components/ui";
+import { Aviso, Cartao, FotoCandidato, Senha, corCandidato } from "@/components/ui";
+import { api } from "@/lib/api";
 import { useFila } from "@/lib/fila/FilaProvider";
-import { duracao, ehNulo, horario, type ContagemCandidato } from "@/lib/fila/tipos";
+import { duracao, ehNulo, horario, type Candidato, type ContagemCandidato } from "@/lib/fila/tipos";
 
 /**
  * Resultados parciais (GET /resultados). Pública: qualquer um pode ver.
@@ -22,6 +22,14 @@ export default function ResultadosPage() {
 
 function Resultados() {
   const { resultado, resultadoEm, erroResultado, comprovante, status, sincronizado } = useFila();
+  const [candidatos, setCandidatos] = useState<Candidato[] | null>(null);
+
+  useEffect(() => {
+    api<Candidato[]>("/candidatos")
+      .then((r) => setCandidatos(r.data))
+      .catch(() => null);
+  }, []);
+
   const votouEm = comprovante?.voto.candidatoId;
   // Enquanto o primeiro GET não volta, quem votou já tem o resultado do momento do voto.
   const dados = resultado ?? comprovante?.resultado ?? null;
@@ -70,7 +78,7 @@ function Resultados() {
         </>
       )}
 
-      {comprovante ? <Comprovante /> : <AcoesVisitante />}
+      {comprovante ? <Comprovante candidatos={candidatos} /> : <AcoesVisitante />}
     </div>
   );
 }
@@ -175,29 +183,84 @@ function Resumo({ dados, atualizadoEm }: { dados: ContagemCandidato[]; atualizad
   );
 }
 
-function Comprovante() {
-  const { comprovante, concluir } = useFila();
-  const router = useRouter();
+function Comprovante({ candidatos }: { candidatos?: Candidato[] | null }) {
+  const { comprovante, resultado } = useFila();
   if (!comprovante) return null;
   const { voto } = comprovante;
-  const nulo = comprovante.resultado.some((c) => c.candidatoId === voto.candidatoId && ehNulo(c));
 
-  function sair() {
-    concluir();
-    router.replace("/");
-  }
+  // Busca dados completos do candidato para exibir foto, partido e número
+  const candidatoInfo = candidatos?.find((c) => c.id === voto.candidatoId);
+  const listaCandidatos = comprovante.resultado?.length > 0 ? comprovante.resultado : (resultado ?? []);
+  const contagem = listaCandidatos.find((c) => c.candidatoId === voto.candidatoId);
+
+  const nulo =
+    voto.candidatoId === 1 ||
+    (candidatoInfo ? ehNulo(candidatoInfo) : contagem ? ehNulo(contagem) : false);
+  const urlFoto = candidatoInfo?.urlFoto ?? contagem?.urlFoto ?? null;
+  const partido = candidatoInfo?.partido ?? contagem?.partido ?? null;
+  const nomeCandidato = nulo
+    ? "Voto Nulo"
+    : (candidatoInfo?.nome || contagem?.nome || voto.candidatoNome || "Candidato");
 
   return (
-    <Cartao>
-      <h2 className="font-semibold mb-4">Seu comprovante</h2>
-      <div className="grid gap-6 sm:grid-cols-[14rem_1fr] items-start">
-        <div className="flex items-center gap-3">
-          <FotoCandidato id={voto.candidatoId} nome={voto.candidatoNome ?? ""} nulo={nulo} className="size-12 text-xl" />
+    <Cartao className="border-2 border-border/90 bg-card p-5 sm:p-6 shadow-sm">
+      {/* Cabeçalho do comprovante com status responsivo */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 mb-5 border-b border-border">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2.5 flex-wrap">
+            <h2 className="font-bold text-lg sm:text-xl tracking-tight text-foreground">
+              Comprovante de votação
+            </h2>
+            <span className="inline-flex sm:hidden items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-success-soft text-success border border-success/30 shrink-0">
+              <svg className="size-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
+              Confirmado
+            </span>
+          </div>
+          <p className="text-xs sm:text-sm text-muted mt-0.5">
+            Voto autenticado e registrado com sucesso na urna eletrônica
+          </p>
+        </div>
+
+        <span className="hidden sm:inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-bold bg-success-soft text-success shrink-0 border border-success/30 shadow-xs">
+          <svg className="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <polyline points="20 6 9 17 4 12" />
+          </svg>
+          Status: Confirmado
+        </span>
+      </div>
+
+      <div className="grid gap-6 md:grid-cols-[16rem_1fr] items-start">
+        {/* Identificação visual do candidato ou voto nulo */}
+        <div className="flex items-center gap-3.5 p-3.5 rounded-xl bg-background/70 border border-border/80 w-full">
+          <FotoCandidato
+            id={voto.candidatoId}
+            nome={nomeCandidato}
+            urlFoto={urlFoto}
+            nulo={nulo}
+            className="size-16 sm:size-18 text-3xl shrink-0 aspect-square"
+          />
           <div className="min-w-0">
-            <p className="text-xs text-muted">{nulo ? "Você" : "Você votou em"}</p>
-            <p className="font-semibold truncate">{nulo ? "Votou nulo" : voto.candidatoNome}</p>
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-muted">
+              {nulo ? "Opção escolhida" : "Candidato escolhido"}
+            </p>
+            <p className="font-bold truncate text-base sm:text-lg text-foreground">
+              {nomeCandidato}
+            </p>
+            {!nulo && partido ? (
+              <p className="text-xs text-muted truncate">
+                {partido.nome} · <strong className="font-mono text-foreground font-semibold">{partido.digito}</strong>
+              </p>
+            ) : nulo ? (
+              <p className="text-xs text-muted">
+                Voto não computado para nenhum candidato
+              </p>
+            ) : null}
           </div>
         </div>
+
+        {/* Detalhes de auditoria do voto */}
         <dl className="divide-y divide-border text-sm">
           <Linha rotulo="Eleitor">
             <Senha usuario={voto} /> {voto.usuarioNome}
@@ -207,17 +270,21 @@ function Comprovante() {
           <Linha rotulo="Da entrada na fila até a cabine">{duracao(voto.tempoNaFilaMs)}</Linha>
         </dl>
       </div>
-      <div className="mt-5 flex justify-end">
-        <Botao className="px-10 py-3 text-base" onClick={sair}>
-          Concluir
-        </Botao>
-      </div>
     </Cartao>
   );
 }
 
 function AcoesVisitante() {
-  const { meuTicket } = useFila();
+  const { meuTicket, jaVotou } = useFila();
+  if (jaVotou) {
+    return (
+      <div className="rounded-xl border border-border/80 bg-card p-4 text-center sm:text-left flex flex-col sm:flex-row items-center justify-between gap-3">
+        <p className="text-sm text-muted">
+          ✓ Seu voto foi registrado com sucesso nesta eleição. A apuração acima é atualizada em tempo real.
+        </p>
+      </div>
+    );
+  }
   const classe = "rounded-lg px-5 py-2.5 text-sm font-medium transition";
   return (
     <div className="flex flex-wrap gap-2">

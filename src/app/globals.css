@@ -17,12 +17,12 @@
   --success-soft: #dcfce7;
   --danger: #b91c1c;
   --danger-soft: #fee2e2;
-  --candidato-a: #6d28d9;
-  --candidato-a-soft: #ede9fe;
-  --candidato-b: #c2410c;
-  --candidato-b-soft: #ffedd5;
-  --nulo: #4b5563;
-  --nulo-soft: #eef0f3;
+  --candidato-a: #1d4ed8;
+  --candidato-a-soft: #dbeafe;
+  --candidato-b: #b91c1c;
+  --candidato-b-soft: #fee2e2;
+  --nulo: #303030;
+  --nulo-soft: #adadad;
 }
 
 /* Tema escuro: escolhido no botão do cabeçalho (data-theme="dark").
@@ -45,12 +45,12 @@
   --success-soft: #0d2e1a;
   --danger: #f87171;
   --danger-soft: #3a1212;
-  --candidato-a: #a78bfa;
-  --candidato-a-soft: #2a1d4a;
-  --candidato-b: #fb923c;
-  --candidato-b-soft: #3d1d0a;
-  --nulo: #9ca3af;
-  --nulo-soft: #22262e;
+  --candidato-a: #60a5fa;
+  --candidato-a-soft: #172554;
+  --candidato-b: #f87171;
+  --candidato-b-soft: #3a1212;
+  --nulo: #ffffff;
+  --nulo-soft: #3a393b;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -71,12 +71,12 @@
     --success-soft: #0d2e1a;
     --danger: #f87171;
     --danger-soft: #3a1212;
-    --candidato-a: #a78bfa;
-    --candidato-a-soft: #2a1d4a;
-    --candidato-b: #fb923c;
-    --candidato-b-soft: #3d1d0a;
-    --nulo: #9ca3af;
-    --nulo-soft: #22262e;
+    --candidato-a: #60a5fa;
+    --candidato-a-soft: #172554;
+    --candidato-b: #f87171;
+    --candidato-b-soft: #3a1212;
+    --nulo: #303030;
+    --nulo-soft: #adadad;
   }
 }
 
@@ -110,4 +110,12 @@ body {
   background: var(--background);
   color: var(--foreground);
   transition: background-color 0.2s, color 0.2s;
+}
+
+/* Oculta marca d'água / indicador de desenvolvimento do Next.js */
+[data-nextjs-toast],
+nextjs-portal,
+#nextjs-dev-indicator,
+nextjs-dev-tools-indicator {
+  display: none !important;
 }

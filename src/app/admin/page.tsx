@@ -82,6 +82,15 @@ function Admin() {
       setOcupado(true);
       try {
         const r = await chamar<T>(rota, metodo);
+        if (rota === "/fila/reiniciar") {
+          try {
+            localStorage.removeItem("fila:jaVotou:v1");
+            localStorage.removeItem("fila:voto:v1");
+            localStorage.removeItem("fila:ticket:v2");
+          } catch {
+            // ignora
+          }
+        }
         aoReceber?.(r.data);
         setUltima({
           metodo,
@@ -181,6 +190,13 @@ function Admin() {
       (d) => `${senha(u)} (${u.nome}) está na ${d.posicaoFila}ª posição da ${rotuloFila(u.tipoFila)}.`,
     );
 
+  const mockInicializado = Boolean(
+    estado?.modoMock ||
+    estado?.naCabine?.mock ||
+    estado?.preferencial.some((u) => u.mock) ||
+    estado?.comum.some((u) => u.mock)
+  );
+
   const ACOES: Array<{ rotulo: string; metodo: string; rota: string; acao: () => void; desabilitar?: boolean; dica: string }> = [
     { rotulo: "Ver fila", metodo: "GET", rota: "/fila", acao: () => void executar("GET", "/fila"), dica: "Estado completo das filas e da cabine" },
     { rotulo: "Posições", metodo: "GET", rota: "/fila/posicoes", acao: () => void executar("GET", "/fila/posicoes"), dica: "Posição atual de todos e quem pode votar" },
@@ -200,18 +216,43 @@ function Admin() {
       desabilitar: !estado?.naCabine,
       dica: "Tira quem está na cabine sem voto",
     },
-    { rotulo: "Encher fila (+30)", metodo: "POST", rota: "/fila/mock", acao: () => void executar("POST", "/fila/mock"), dica: "Coloca 30 pessoas de demonstração na fila; elas votam sozinhas quando chamadas" },
-    {
-      rotulo: "Reiniciar do zero",
-      metodo: "POST",
-      rota: "/fila/reiniciar",
-      acao: () => {
-        if (confirm("Recomeçar do zero? Apaga a fila, a cabine e TODOS os votos, e enche a fila de novo.")) {
-          void executar("POST", "/fila/reiniciar");
-        }
-      },
-      dica: "Esvazia filas e cabine, apaga os votos, volta as senhas para P001/C001 e enche a fila de novo",
-    },
+    ...(mockInicializado
+      ? [
+          {
+            rotulo: "Encher fila (+30)",
+            metodo: "POST",
+            rota: "/fila/mock",
+            acao: () => void executar("POST", "/fila/mock"),
+            dica: "Adiciona +30 pessoas de demonstração na fila mock",
+          },
+          {
+            rotulo: "Reiniciar fila",
+            metodo: "POST",
+            rota: "/fila/reiniciar",
+            acao: () => {
+              if (confirm("Recomeçar fila mock do zero? Apaga a fila mock, a cabine e votos de demonstração, e enche de novo.")) {
+                void executar("POST", "/fila/reiniciar");
+              }
+            },
+            dica: "Esvazia filas e cabine mock, apaga os votos de teste e enche a fila novamente",
+          },
+          {
+            rotulo: "Desativar mock",
+            metodo: "POST",
+            rota: "/fila/mock/desativar",
+            acao: () => void executar("POST", "/fila/mock/desativar"),
+            dica: "Desativa o modo demonstração e restaura a fila e votos reais",
+          },
+        ]
+      : [
+          {
+            rotulo: "Inicializar mock",
+            metodo: "POST",
+            rota: "/fila/mock",
+            acao: () => void executar("POST", "/fila/mock"),
+            dica: "Ativa a demonstração e coloca 30 pessoas de teste na fila",
+          },
+        ]),
     {
       rotulo: "Resultados parciais",
       metodo: "GET",
@@ -239,15 +280,62 @@ function Admin() {
         </div>
       </div>
 
+      {mockInicializado && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-preferencial/40 bg-preferencial-soft/50 px-4 py-3 text-sm">
+          <div className="flex items-center gap-2">
+            <span className="size-2 rounded-full bg-preferencial animate-pulse" />
+            <span className="font-medium text-foreground">Modo Demonstração (Mock) ativo</span>
+            <span className="text-muted text-xs sm:text-sm">— as operações de teste não afetam a fila real</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Botao
+              variante="secundario"
+              className="text-xs py-1.5 px-3"
+              disabled={ocupado}
+              onClick={() => void executar("POST", "/fila/mock")}
+            >
+              Encher fila (+30)
+            </Botao>
+            <Botao
+              variante="secundario"
+              className="text-xs py-1.5 px-3"
+              disabled={ocupado}
+              onClick={() => {
+                if (confirm("Recomeçar fila mock do zero? Apaga a fila mock, a cabine e votos de demonstração, e enche de novo.")) {
+                  void executar("POST", "/fila/reiniciar");
+                }
+              }}
+            >
+              Reiniciar fila
+            </Botao>
+            <Botao
+              variante="secundario"
+              className="text-xs py-1.5 px-3 text-danger hover:bg-danger-soft"
+              disabled={ocupado}
+              onClick={() => void executar("POST", "/fila/mock/desativar")}
+            >
+              Sair do mock
+            </Botao>
+          </div>
+        </div>
+      )}
+
       <div className="grid gap-4 lg:grid-cols-[1fr_24rem] items-start">
         <ControleCabine
           naCabine={estado?.naCabine ?? null}
           proximo={estado ? (estado.preferencial[0] ?? estado.comum[0] ?? null) : null}
           aguardando={aguardando}
           ocupado={ocupado}
+          mockInicializado={mockInicializado}
           chamar={() => void executar("POST", "/fila/proximo")}
           liberar={() => void executar("POST", "/fila/liberar")}
           encher={() => void executar("POST", "/fila/mock")}
+          reiniciar={() => {
+            if (confirm("Recomeçar fila mock do zero? Apaga a fila mock, a cabine e votos de demonstração, e enche de novo.")) {
+              void executar("POST", "/fila/reiniciar");
+            }
+          }}
+          iniciarMock={() => void executar("POST", "/fila/mock")}
         />
         <Cartao>
           <h2 className="font-semibold mb-3">Votos por candidato</h2>
@@ -425,17 +513,23 @@ function ControleCabine({
   proximo,
   aguardando,
   ocupado,
+  mockInicializado,
   chamar,
   liberar,
   encher,
+  reiniciar,
+  iniciarMock,
 }: {
   naCabine: Usuario | null;
   proximo: UsuarioNaFila | null;
   aguardando: number;
   ocupado: boolean;
+  mockInicializado: boolean;
   chamar: () => void;
   liberar: () => void;
   encher: () => void;
+  reiniciar: () => void;
+  iniciarMock: () => void;
 }) {
   return (
     <Cartao className={naCabine ? "border-primary" : ""}>
@@ -483,9 +577,22 @@ function ControleCabine({
       ) : (
         <div className="flex flex-wrap items-center gap-4">
           <p className="text-muted">Cabine livre e ninguém na fila.</p>
-          <Botao className="ml-auto" disabled={ocupado} onClick={encher}>
-            Encher fila (+30)
-          </Botao>
+          <div className="ml-auto flex items-center gap-2">
+            {mockInicializado ? (
+              <>
+                <Botao disabled={ocupado} onClick={encher}>
+                  Encher fila (+30)
+                </Botao>
+                <Botao variante="secundario" disabled={ocupado} onClick={reiniciar}>
+                  Reiniciar fila
+                </Botao>
+              </>
+            ) : (
+              <Botao variante="secundario" disabled={ocupado} onClick={iniciarMock} title="Ativa a demonstração com 30 pessoas de teste">
+                Inicializar mock (+30)
+              </Botao>
+            )}
+          </div>
         </div>
       )}
     </Cartao>
